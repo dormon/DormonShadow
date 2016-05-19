@@ -40,7 +40,7 @@ class VariableRegisterManipulator{
         //std::cerr<<"set cd->_name: "<<cd->_name<<std::endl;
         *((T*)value)=(T)(*cd->_vr->getVariable(cd->_name)->getOutputData());
       }
-    void _addRegister(std::shared_ptr<ge::de::VariableRegister>const&vr,std::string group,std::string outGroup,std::string notGroup);
+    void _addRegister(std::shared_ptr<ge::de::VariableRegister>const&vr,std::string group,std::string outGroup,std::string notGroup,std::string groupLabel);
   public:
     VariableRegisterManipulator(std::shared_ptr<ge::de::VariableRegister> const&vr);
     virtual ~VariableRegisterManipulator();
