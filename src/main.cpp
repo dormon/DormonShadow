@@ -57,6 +57,7 @@ struct Data{
   };
   TwBar*Bar;
   float Speed;
+  std::string text = "cesta_do_stredu_zemne";
 };
 
 
@@ -153,8 +154,6 @@ void Data::init(Data*data){
 
   TwInit(TW_OPENGL_CORE,nullptr);
   TwWindowSize(data->window->getWidth(),data->window->getHeight());
-  data->Bar=TwNewBar("TweakBar");
-  TwAddVarRW(data->Bar,"Speed"  ,TW_TYPE_FLOAT  ,&data->Speed     ," label='Movement speed' min=0 max=2 step=0.01"  );
 
   data->variableManipulator = std::make_shared<VariableRegisterManipulator>(data->variableRegister);
 }

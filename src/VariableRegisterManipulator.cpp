@@ -46,7 +46,8 @@ std::string stringer(Args const&... args)
   return result;
 }
 
-void VariableRegisterManipulator::_addRegister(std::shared_ptr<ge::de::VariableRegister>const&vr,std::string group,std::string outGroup,std::string notGroup,std::string groupLabel){
+bool VariableRegisterManipulator::_addRegister(std::shared_ptr<ge::de::VariableRegister>const&vr,std::string group,std::string notGroup){
+  bool hasVariable = false;
   for(auto x=vr->varsBegin();x!=vr->varsEnd();++x){
     if(x->first.find(".")!=std::string::npos)continue;
     auto type=x->second->getOutputData()->getManager()->getTypeIdType(x->second->getOutputData()->getId());
@@ -56,8 +57,9 @@ void VariableRegisterManipulator::_addRegister(std::shared_ptr<ge::de::VariableR
         VariableRegisterManipulator::_get<TYPE>,\
         VariableRegisterManipulator::_set<TYPE>,\
         (void*)this->_callbackData[this->_callbackData.size()-1],stringer(groupCommand(group),labelCommand(x->first)).c_str());\
-    TwDefine(movingCommand(group,outGroup,notGroup).c_str());\
-    TwDefine(stringer(closingCommand(group,notGroup),labelCommand(groupLabel)).c_str());\
+    /*TwDefine(movingCommand(group,outGroup,notGroup).c_str());*/\
+    /*TwDefine(stringer(closingCommand(group,notGroup),labelCommand(groupLabel)).c_str());*/\
+    hasVariable = true;\
     break
     switch(type){
       case TypeRegister::BOOL:
@@ -83,6 +85,14 @@ void VariableRegisterManipulator::_addRegister(std::shared_ptr<ge::de::VariableR
       case TypeRegister::F64:
         CASE(double,TW_TYPE_DOUBLE);
       case TypeRegister::STRING:
+        this->_callbackData.push_back(new _CallBackData(x->first,vr));\
+        TwAddVarCB(this->_bar,stringer(vr->getFullName(),".",x->first).c_str(),TW_TYPE_STDSTRING,
+            VariableRegisterManipulator::_getString,
+            VariableRegisterManipulator::_setString,
+            (void*)this->_callbackData[this->_callbackData.size()-1],stringer(groupCommand(group),labelCommand(x->first)).c_str());
+        hasVariable = true;
+        //TwDefine(movingCommand(group,outGroup,notGroup).c_str());
+        //TwDefine(stringer(closingCommand(group,notGroup),labelCommand(groupLabel)).c_str());
         break;
       case TypeRegister::ARRAY:
         break;
@@ -93,15 +103,21 @@ void VariableRegisterManipulator::_addRegister(std::shared_ptr<ge::de::VariableR
     }
   }
   for(auto g=vr->registersBegin();g!=vr->registersEnd();++g){
-    this->_addRegister(g->second,vr->getFullName()+"."+g->first,vr->getFullName(),notGroup,g->second->getName());//vr->getName());
+    auto hv = this->_addRegister(g->second,vr->getFullName()+"."+g->first,notGroup);//vr->getName());
+    TwDefine(movingCommand(vr->getFullName()+"."+g->first,vr->getFullName(),notGroup).c_str());
+    if(hv){
+      hasVariable = true;
+      TwDefine(stringer(closingCommand(vr->getFullName()+"."+g->first,notGroup),labelCommand(g->second->getName())).c_str());
+    }
   }
+  return hasVariable;
 }
 
 VariableRegisterManipulator::VariableRegisterManipulator(
     std::shared_ptr<ge::de::VariableRegister> const&vr){
   this->_bar = TwNewBar(vr->getName().c_str());
   this->_vr = vr;
-  this->_addRegister(vr,"","",vr->getFullName(),"");
+  this->_addRegister(vr,"",vr->getFullName());
 }
 
 VariableRegisterManipulator::~VariableRegisterManipulator(){

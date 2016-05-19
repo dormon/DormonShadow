@@ -38,9 +38,23 @@ class VariableRegisterManipulator{
         //std::cerr<<"set data: "<<data<<std::endl;
         _CallBackData*cd=(_CallBackData*)data;
         //std::cerr<<"set cd->_name: "<<cd->_name<<std::endl;
-        *((T*)value)=(T)(*cd->_vr->getVariable(cd->_name)->getOutputData());
+        *((T*)value)=(T&)(*cd->_vr->getVariable(cd->_name)->getOutputData());
       }
-    void _addRegister(std::shared_ptr<ge::de::VariableRegister>const&vr,std::string group,std::string outGroup,std::string notGroup,std::string groupLabel);
+    static void TW_CALL _getString(const void *value, void * clientData){
+      _CallBackData*cd=(_CallBackData*)clientData;
+      const std::string *srcPtr = static_cast<const std::string *>(value);
+      if((std::string&)(*cd->_vr->getVariable(cd->_name)->getOutputData())!=*((std::string*)srcPtr)){
+        cd->_vr->getVariable(cd->_name)->update(*((std::string*)srcPtr));
+      }
+    }
+
+    static void TW_CALL _setString(void *value, void * clientData){
+      _CallBackData*cd=(_CallBackData*)clientData;
+      std::string *destPtr = static_cast<std::string *>(value);
+      TwCopyStdStringToLibrary(*destPtr,(std::string&)(*cd->_vr->getVariable(cd->_name)->getOutputData()));
+    }
+
+    bool _addRegister(std::shared_ptr<ge::de::VariableRegister>const&vr,std::string group,std::string notGroup);
   public:
     VariableRegisterManipulator(std::shared_ptr<ge::de::VariableRegister> const&vr);
     virtual ~VariableRegisterManipulator();
