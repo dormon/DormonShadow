@@ -3,10 +3,12 @@ cmake_minimum_required(VERSION 3.0.0)
 PROJECT(AntTest)
 
 set(INCLUDES
+  include/VariableRegisterManipulator.h
   )
 
 set(SOURCES
   src/main.cpp
+  src/VariableRegisterManipulator.cpp
   )
 
 include_directories(include /usr/local/include)
@@ -21,6 +23,6 @@ find_package(SDL2          REQUIRED)
 
 set(APP_NAME AntTest)
 add_executable(${APP_NAME} ${SOURCES} ${INCLUDES})
-target_link_libraries(${APP_NAME} SDL2 geGL geCore geUtil SDLWindow AntTweakBar GL)
+target_link_libraries(${APP_NAME} SDL2 geGL geCore geDE geParser geUtil SDLWindow AntTweakBar GL)
 
 

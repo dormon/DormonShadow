@@ -3,8 +3,11 @@
 #include<geGL/geGL.h>
 #include<geGL/Shader.h>
 #include<geGL/Program.h>
-#include<geUtil/NamespaceWithUsers.h>
-#include<geUtil/copyArgumentManager2Namespace.h>
+#include<geDE/TypeRegister.h>
+#include<geDE/VariableRegister.h>
+#include<geDE/FunctionRegister.h>
+#include<geDE/StdFunctions.h>
+#include<geUtil/CopyArgumentManager2VariableRegister.h>
 #include<geUtil/ArgumentManager/ArgumentManager.h>
 #include<geAd/SDLWindow/SDLWindow.h>
 #include<geAd/SDLWindow/SDLEventProc.h>
@@ -15,15 +18,20 @@
 
 #include<AntTweakBar.h>
 
+#include<VariableRegisterManipulator.h>
+
 struct Data{
-  std::shared_ptr<ge::core::TypeRegister>           typeRegister = nullptr;
-  std::shared_ptr<ge::util::sim::NamespaceWithUsers>sData        = nullptr;
+  std::shared_ptr<ge::de::TypeRegister>             typeRegister     = nullptr;
+  std::shared_ptr<ge::de::FunctionRegister>         functionRegister = nullptr;
+  std::shared_ptr<ge::de::NameRegister>             nameRegister     = nullptr;
+  std::shared_ptr<ge::de::VariableRegister>         variableRegister = nullptr;
   std::shared_ptr<ge::gl::opengl::FunctionProvider> gl           = nullptr;
   std::shared_ptr<ge::util::SDLEventProc>           mainLoop     = nullptr;
   std::shared_ptr<ge::util::SDLWindow>              window       = nullptr;
   std::shared_ptr<ge::gl::Program>program0 = nullptr;
   std::shared_ptr<ge::gl::Program>program1 = nullptr;
   std::shared_ptr<ge::gl::VertexArray>emptyVAO = nullptr;
+  std::shared_ptr<VariableRegisterManipulator>variableManipulator = nullptr;
   static void init(Data*data);
   static void deinit(Data*data);
   class IdleCallback: public ge::util::CallbackInterface{
@@ -55,10 +63,14 @@ struct Data{
 
 int main(int argc,char*argv[]){
   Data data;
-  data.typeRegister = std::make_shared<ge::core::TypeRegister>();
-  data.sData        = std::make_shared<ge::util::sim::NamespaceWithUsers>("*");
+  data.typeRegister     = std::make_shared<ge::de::TypeRegister>();
+  data.nameRegister     = std::make_shared<ge::de::NameRegister>();
+  data.functionRegister = std::make_shared<ge::de::FunctionRegister>(data.typeRegister,data.nameRegister);
+  ge::de::registerStdFunctions(data.functionRegister);
+  data.variableRegister = std::make_shared<ge::de::VariableRegister>("*");
   auto argm = std::make_shared<ge::util::ArgumentManager>(argc-1,argv+1);
-  ge::util::sim::copyArgumentManager2Namespace(data.sData,&*argm,data.typeRegister);
+  ge::util::copyArgumentManager2VariableRegister(data.variableRegister,*argm,data.functionRegister);
+  std::cout<<data.variableRegister->toStr(0,data.typeRegister)<<std::endl;
 
   data.mainLoop = std::make_shared<ge::util::SDLEventProc>(true);
   data.mainLoop->setIdleCallback(std::make_shared<Data::IdleCallback>(&data));
@@ -143,9 +155,12 @@ void Data::init(Data*data){
   TwWindowSize(data->window->getWidth(),data->window->getHeight());
   data->Bar=TwNewBar("TweakBar");
   TwAddVarRW(data->Bar,"Speed"  ,TW_TYPE_FLOAT  ,&data->Speed     ," label='Movement speed' min=0 max=2 step=0.01"  );
+
+  data->variableManipulator = std::make_shared<VariableRegisterManipulator>(data->variableRegister);
 }
 
 void Data::deinit(Data*data){
   (void)data;
+  data->variableManipulator = nullptr;
   TwTerminate();
 }
