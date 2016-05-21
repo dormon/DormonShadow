@@ -51,15 +51,23 @@ void _set(void*value,void*data){
 void TW_CALL _getString(const void *value, void * clientData){
   auto cd=(CallbackData*)clientData;
   const std::string *srcPtr = static_cast<const std::string *>(value);
-  if((std::string&)(*cd->_vr->getVariable(cd->_name)->getOutputData())!=*((std::string*)srcPtr)){
-    cd->_vr->getVariable(cd->_name)->update(*((std::string*)srcPtr));
+  auto res = cd->_vr->getVariable(cd->_name)->getOutputData();
+  res = address(res,cd->_path);
+
+  if((std::string&)(*res)!=*((std::string*)srcPtr)){
+    (std::string&)(*res) = *((std::string*)srcPtr);
+    cd->_vr->getVariable(cd->_name)->setDirty();
+    //cd->_vr->getVariable(cd->_name)->update(*((std::string*)srcPtr));
   }
 }
 
 void TW_CALL _setString(void *value, void * clientData){
   auto cd=(CallbackData*)clientData;
   std::string *destPtr = static_cast<std::string *>(value);
-  TwCopyStdStringToLibrary(*destPtr,(std::string&)(*cd->_vr->getVariable(cd->_name)->getOutputData()));
+  auto res = cd->_vr->getVariable(cd->_name)->getOutputData();
+  res = address(res,cd->_path);
+  TwCopyStdStringToLibrary(*destPtr,(std::string&)(*res));
+  //TwCopyStdStringToLibrary(*destPtr,(std::string&)(*cd->_vr->getVariable(cd->_name)->getOutputData()));
 }
 
 
