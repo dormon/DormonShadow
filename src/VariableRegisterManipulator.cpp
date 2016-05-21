@@ -18,18 +18,34 @@ class CallbackData{
     }
 };
 
+std::shared_ptr<Resource>address(
+    std::shared_ptr<Resource>res,
+    std::vector<size_t>const&path){
+  std::shared_ptr<Resource>result = res;
+  for(auto const&x:path)
+    res = (*res)[x];
+  return res;
+}
+
 template<typename T>
 void _get(const void*value,void*data){
   auto cd=(CallbackData*)data;
-  if((T&)(*cd->_vr->getVariable(cd->_name)->getOutputData())!=*((T*)value)){
-    cd->_vr->getVariable(cd->_name)->update(*((T*)value));
+  auto res = cd->_vr->getVariable(cd->_name)->getOutputData();
+  res = address(res,cd->_path);
+  if((T&)(*res)!=*((T*)value)){
+    (T&)(*res) = *((T*)value);
+    cd->_vr->getVariable(cd->_name)->setDirty();
+    //cd->_vr->getVariable(cd->_name)->update(*((T*)value));
   }
 }
 
 template<typename T>
 void _set(void*value,void*data){
   auto cd=(CallbackData*)data;
-  *((T*)value)=(T&)(*cd->_vr->getVariable(cd->_name)->getOutputData());
+  auto res = cd->_vr->getVariable(cd->_name)->getOutputData();
+  res = address(res,cd->_path);
+  *((T*)value)=(T&)(*res);
+  //*((T*)value)=(T&)(*cd->_vr->getVariable(cd->_name)->getOutputData());
 }
 
 void TW_CALL _getString(const void *value, void * clientData){
@@ -100,7 +116,7 @@ std::string toString(T const&t){
 TwAddVarCB(this->_bar,varFullName.c_str(),ENUM,\
     _get<TYPE>,\
     _set<TYPE>,\
-    (void*)this->_callbackData.back(),stringer(groupCommand(group),labelCommand(varName),ENUM==TW_TYPE_FLOAT?" step=0.1 ":"").c_str());\
+    (void*)this->_callbackData.back(),stringer(groupCommand(group),labelCommand(varLabelName),ENUM==TW_TYPE_FLOAT?" step=0.1 ":"").c_str());\
 hasVariable = true
 
 bool VariableRegisterManipulator::_addVariable(
@@ -108,16 +124,17 @@ bool VariableRegisterManipulator::_addVariable(
     std::shared_ptr<Nullary>const&var,
     std::shared_ptr<VariableRegister>const&vr,
     std::string group,
-    std::vector<size_t>&path){
+    std::vector<size_t>&path,
+    TypeRegister::TypeID const&typeId){
   bool hasVariable = false;
-  auto typeId = var->getOutputData()->getId();
   auto tr = var->getOutputData()->getManager();
   auto type = tr->getTypeIdType(typeId);
   std::string varFullName = stringer(vr->getFullName(),".",varName);
   for(auto const&x:path)
     varFullName = stringer(varFullName,"[",toString(x),"]");
+  std::string varLabelName = varName;
   for(auto const&x:path)
-    varName = stringer(varName,"[",toString(x),"]");
+    varLabelName = stringer(varLabelName,"[",toString(x),"]");
   switch(type){
     case TypeRegister::BOOL:
       CASE(bool,TW_TYPE_BOOLCPP);
@@ -159,7 +176,11 @@ bool VariableRegisterManipulator::_addVariable(
       hasVariable = true;
       break;
     case TypeRegister::ARRAY:
-
+      for(size_t i = 0;i<tr->getArraySize(typeId);++i){
+        path.push_back(i);
+        hasVariable |=this->_addVariable(varName,var,vr,group,path,tr->getArrayInnerTypeId(typeId));
+        path.pop_back();
+      }
       break;
     case TypeRegister::STRUCT:
       break;
@@ -176,7 +197,7 @@ bool VariableRegisterManipulator::_addRegister(std::shared_ptr<VariableRegister>
     auto varName = x->first;
     auto var = x->second;
     std::vector<size_t>path;
-    hasVariable |= this->_addVariable(varName,var,vr,group,path);
+    hasVariable |= this->_addVariable(varName,var,vr,group,path,var->getOutputData()->getId());
   }
   for(auto g=vr->registersBegin();g!=vr->registersEnd();++g){
     auto hv = this->_addRegister(g->second,vr->getFullName()+"."+g->first,notGroup);//vr->getName());
