@@ -133,67 +133,58 @@ bool VariableRegisterManipulator::_addVariable(
     std::shared_ptr<VariableRegister>const&vr,
     std::string group,
     std::vector<size_t>&path,
-    TypeRegister::TypeID const&typeId){
+    TypeRegister::TypeId const&typeId){
   bool hasVariable = false;
   auto tr = var->getOutputData()->getManager();
-  auto type = tr->getTypeIdType(typeId);
+  //auto type = tr->getTypeIdType(typeId);
+  auto typeName = tr->getTypeIdName(typeId);
   std::string varFullName = stringer(vr->getFullName(),".",varName);
   for(auto const&x:path)
     varFullName = stringer(varFullName,"[",toString(x),"]");
   std::string varLabelName = varName;
   for(auto const&x:path)
     varLabelName = stringer(varLabelName,"[",toString(x),"]");
-  switch(type){
-    case TypeRegister::BOOL:
-      CASE(bool,TW_TYPE_BOOLCPP);
-      break;
-    case TypeRegister::I8:
-      CASE(int8_t,TW_TYPE_INT8);
-      break;
-    case TypeRegister::I16:
-      CASE(int16_t,TW_TYPE_INT16);
-      break;
-    case TypeRegister::I32:
-      CASE(int32_t,TW_TYPE_INT32);
-      break;
-    case TypeRegister::I64:
-      break;
-    case TypeRegister::U8:
-      CASE(uint8_t,TW_TYPE_UINT8);
-      break;
-    case TypeRegister::U16:
-      CASE(uint16_t,TW_TYPE_UINT16);
-      break;
-    case TypeRegister::U32:
-      CASE(uint32_t,TW_TYPE_UINT32);
-      break;
-    case TypeRegister::U64:
-      break;
-    case TypeRegister::F32:
-      CASE(float,TW_TYPE_FLOAT);
-      break;
-    case TypeRegister::F64:
-      CASE(double,TW_TYPE_DOUBLE);
-      break;
-    case TypeRegister::STRING:
-      this->_callbackData.push_back(new CallbackData(varName,vr));
-        TwAddVarCB(this->_bar,varFullName.c_str(),TW_TYPE_STDSTRING,
-            _getString,
-            _setString,
-            (void*)this->_callbackData.back(),stringer(groupCommand(group),labelCommand(varName)).c_str());
-      hasVariable = true;
-      break;
-    case TypeRegister::ARRAY:
-      for(size_t i = 0;i<tr->getArraySize(typeId);++i){
-        path.push_back(i);
-        hasVariable |=this->_addVariable(varName,var,vr,group,path,tr->getArrayInnerTypeId(typeId));
-        path.pop_back();
-      }
-      break;
-    case TypeRegister::STRUCT:
-      break;
-    default:
-      break;
+  if(typeName == TypeRegister::getTypeKeyword<bool>()){
+    CASE(bool,TW_TYPE_BOOLCPP);
+  }
+  if(typeName == TypeRegister::getTypeKeyword<int8_t>()){
+    CASE(int8_t,TW_TYPE_INT8);
+  }
+  if(typeName == TypeRegister::getTypeKeyword<int16_t>()){
+    CASE(int16_t,TW_TYPE_INT16);
+  }
+  if(typeName == TypeRegister::getTypeKeyword<int32_t>()){
+    CASE(int32_t,TW_TYPE_INT32);
+  }
+  if(typeName == TypeRegister::getTypeKeyword<uint8_t>()){
+    CASE(uint8_t,TW_TYPE_UINT8);
+  }
+  if(typeName == TypeRegister::getTypeKeyword<uint16_t>()){
+    CASE(uint16_t,TW_TYPE_UINT16);
+  }
+  if(typeName == TypeRegister::getTypeKeyword<uint32_t>()){
+    CASE(uint32_t,TW_TYPE_UINT32);
+  }
+  if(typeName == TypeRegister::getTypeKeyword<float>()){
+    CASE(float,TW_TYPE_FLOAT);
+  }
+  if(typeName == TypeRegister::getTypeKeyword<double>()){
+    CASE(double,TW_TYPE_DOUBLE);
+  }
+  if(typeName == TypeRegister::getTypeKeyword<std::string>()){
+    this->_callbackData.push_back(new CallbackData(varName,vr));
+    TwAddVarCB(this->_bar,varFullName.c_str(),TW_TYPE_STDSTRING,
+        _getString,
+        _setString,
+        (void*)this->_callbackData.back(),stringer(groupCommand(group),labelCommand(varName)).c_str());
+    hasVariable = true;
+  }
+  if(tr->getTypeIdType(typeId) == TypeRegister::ARRAY){
+    for(size_t i = 0;i<tr->getArraySize(typeId);++i){
+      path.push_back(i);
+      hasVariable |=this->_addVariable(varName,var,vr,group,path,tr->getArrayElementTypeId(typeId));
+      path.pop_back();
+    }
   }
   return hasVariable;
 }

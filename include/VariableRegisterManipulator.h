@@ -26,5 +26,5 @@ class VariableRegisterManipulator{
         std::shared_ptr<ge::de::VariableRegister>const&vr,
         std::string group,
         std::vector<size_t>&path,
-        ge::de::TypeRegister::TypeID const&typeId);
+        ge::de::TypeRegister::TypeId const&typeId);
 };
