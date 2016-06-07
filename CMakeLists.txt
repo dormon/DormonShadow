@@ -23,7 +23,7 @@ find_package(SDL2          REQUIRED)
 
 set(APP_NAME AntTest)
 add_executable(${APP_NAME} ${SOURCES} ${INCLUDES})
-target_link_libraries(${APP_NAME} SDL2 geGLd geCored geDEd geParserd geUtild SDLWindowd AntTweakBar GL assimp)
+target_link_libraries(${APP_NAME} SDL2 geGLd geCored geDEd geParserd geUtild geCored SDLWindowd AntTweakBar GL assimp)
 
 add_custom_target(copy-shaders ALL
   COMMAND cmake -E copy_directory ${CMAKE_SOURCE_DIR}/shaders ${CMAKE_BINARY_DIR}/shaders
