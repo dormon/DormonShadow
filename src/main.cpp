@@ -50,6 +50,7 @@ struct Data{
   };
   std::shared_ptr<ge::de::Resource>model = nullptr;
   std::shared_ptr<ge::de::Function>prg = nullptr;
+  std::shared_ptr<ge::de::Function>blafce = nullptr;
 };
 
 namespace ge{
@@ -104,31 +105,24 @@ std::string shaderSourceLoader(
 }
 
 std::shared_ptr<ge::gl::Shader>createVertexShader(std::string source){
+  std::cout<<"createVertexShader"<<std::endl;
   return std::make_shared<ge::gl::Shader>(GL_VERTEX_SHADER,source);
 }
 
 std::shared_ptr<ge::gl::Shader>createFragmentShader(std::string source){
+  std::cout<<"createFragmentShader"<<std::endl;
   return std::make_shared<ge::gl::Shader>(GL_FRAGMENT_SHADER,source);
 }
 
 std::shared_ptr<ge::gl::Program>createProgram2(
     std::shared_ptr<ge::gl::Shader>s0,
     std::shared_ptr<ge::gl::Shader>s1){
+  std::cout<<"createProgram"<<std::endl;
   return std::make_shared<ge::gl::Program>(s0,s1);
 }
 
-
 int main(int argc,char*argv[]){
-  //std::cout<<shaderSourceLoader("#version 450\n","","shaders/","vertex.vp\nfragment.fp");
-  //return 0;
   Data data;
-  /*
-  data.typeRegister     = std::make_shared<ge::de::TypeRegister>();
-  data.nameRegister     = std::make_shared<ge::de::NameRegister>();
-  data.functionRegister = std::make_shared<ge::de::FunctionRegister>(data.typeRegister,data.nameRegister);
-  ge::de::registerStdFunctions(data.functionRegister);
-  data.variableRegister = std::make_shared<ge::de::VariableRegister>("*");
-  */
   auto argm = std::make_shared<ge::util::ArgumentManager>(argc-1,argv+1);
   ge::util::copyArgumentManager2VariableRegister(data.kernel.variableRegister,*argm,data.kernel.functionRegister);
   std::cout<<data.kernel.variableRegister->toStr(0,data.kernel.typeRegister)<<std::endl;
@@ -157,6 +151,8 @@ void Data::IdleCallback::operator()(){
   this->data->gl->glDrawArrays(GL_TRIANGLE_STRIP,0,3);
   this->data->emptyVAO->unbind();
 
+  (*this->data->blafce)();
+
   TwDraw();
   this->data->window->swap();
 }
@@ -176,6 +172,11 @@ bool Data::WindowEventHandler::operator()(ge::util::EventDataPointer const&event
   bool handledByAnt = TwEventSDL(&sdlEventData->event,SDL_MAJOR_VERSION,SDL_MINOR_VERSION);
   if(handledByAnt)return true;
   return false;
+}
+
+std::string bla(std::string str){
+  std::cout<<str<<std::endl;
+  return str;
 }
 
 void Data::init(Data*data){
@@ -202,22 +203,16 @@ void Data::init(Data*data){
       sizeof(aiScene const*),
       nullptr,
       [](void*ptr){aiReleaseImport(*((aiScene const**)ptr));});
-  kernel.addAtomicType(
-      "SharedShader",
-      sizeof(std::shared_ptr<ge::gl::Shader>),
-      [](void*ptr){new(ptr)std::shared_ptr<ge::gl::Shader>;},
-      [](void*ptr){((std::shared_ptr<ge::gl::Shader>*)ptr)->~shared_ptr();});
-  kernel.addAtomicType(
-      "SharedProgram",
-      sizeof(std::shared_ptr<ge::gl::Program>),
-      [](void*ptr){new(ptr)std::shared_ptr<ge::gl::Program>;},
-      [](void*ptr){((std::shared_ptr<ge::gl::Program>*)ptr)->~shared_ptr();});
+  kernel.addAtomicClass<std::shared_ptr<ge::gl::Shader>>("SharedShader");
+  kernel.addAtomicClass<std::shared_ptr<ge::gl::Program>>("SharedProgram");
 
-  kernel.addFunction({"assimpLoader"},assimpLoader);
+
+  kernel.addFunction({"assimpLoader","fileName"},assimpLoader);
   kernel.addFunction({"shaderSourceLoader","source","version","defines","dir","fileNames"},shaderSourceLoader);
   kernel.addFunction({"createVertexShader","sharedShader","source"},createVertexShader);
   kernel.addFunction({"createFragmentShader","sharedShader","source"},createFragmentShader);
   kernel.addFunction({"createProgram2","shaderProgram","shader0","shader1"},createProgram2);
+  kernel.addFunction({"bla","output","input"},bla);
 
 
   //script part
@@ -245,45 +240,15 @@ void Data::init(Data*data){
   auto b = kernel.createFunctionNodeFactory("fragmentShaderSourceLoader","shaderSourceLoader");
   auto aa = kernel.createFunctionNodeFactory("createVertexShaderFromSource","createVertexShader",{a});
   auto bb = kernel.createFunctionNodeFactory("createFragmentShaderFromSource","createFragmentShader",{b});
-
-
   auto c = kernel.createFunctionNodeFactory("createProgramFromVertexFragment","createProgram2",{aa,bb});
-
-  auto fac = std::make_shared<ge::de::CompositeFunctionFactory>("createVSFSProgram");
-  fac->setFactory(c);
-  fac->setInputFactories({
-      {ge::de::CompositeFunctionFactory::FactoryInput(a,0),ge::de::CompositeFunctionFactory::FactoryInput(b,0)},
-      {ge::de::CompositeFunctionFactory::FactoryInput(a,2),ge::de::CompositeFunctionFactory::FactoryInput(b,2)},
-      {ge::de::CompositeFunctionFactory::FactoryInput(a,1)},
-      {ge::de::CompositeFunctionFactory::FactoryInput(a,3)},
-      {ge::de::CompositeFunctionFactory::FactoryInput(b,1)},
-      {ge::de::CompositeFunctionFactory::FactoryInput(b,3)}});
-  auto stringId = kernel.typeRegister->getTypeId("string");
-  auto programId = kernel.typeRegister->getTypeId("SharedProgram");
-  auto facId = kernel.functionRegister->addFunction(kernel.typeRegister->addCompositeType("",{ge::de::TypeRegister::FCE,programId,6,stringId,stringId,stringId,stringId,stringId,stringId}),"createVSFSProgram",fac);
-  kernel.nameRegister->setFceInputName(facId,0,"version");
-  kernel.nameRegister->setFceInputName(facId,1,"directory");
-  kernel.nameRegister->setFceInputName(facId,2,"vsDefines");
-  kernel.nameRegister->setFceInputName(facId,3,"vertexSourceFiles");
-  kernel.nameRegister->setFceInputName(facId,4,"fsDefines");
-  kernel.nameRegister->setFceInputName(facId,5,"fragmentSourceFiles");
-  kernel.nameRegister->setFceOutputName(facId,"sharedProgram");
+  auto fac = kernel.createCompositeFunctionFactory("createVSFSProgram",c,{{a,b},{a,b},{a},{a},{b},{b}},{{0,0},{2,2},{1},{3},{1},{3}});
+  kernel.addCompositeFunction({"sharedProgram","version","vsDefines","vertexSourceFiles","fsDefines","fragmentSourceFiles"},fac);
 
   data->prg = kernel.createFunction("createVSFSProgram",{"program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"},"SharedProgram");
-  /*
-  auto a = std::make_shared<ge::de::FunctionNodeFactory>("");
-  a->setFactory(kernel.functionRegister->sharedFactory("createProgram2"));
-
-  auto vpf = std::make_shared<ge::de::FunctionNodeFactory>("");
-  vpf->setFactory(kernel.functionRegister->sharedFactory("createVertexShader"));
-  vpf->addResourceFactory(std::make_shared<ge::de::ResourceFactory>("string"));
-  vpf->addInputFactory(kernel.functionRegister->sharedResource())
-
-  a->addResourceFactory(std::make_shared<ge::de::ResourceFactory>("SharedShader"));
-  a->addResourceFactory(std::make_shared<ge::de::ResourceFactory>("SharedShader"));
-  */
 
   data->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister);
+
+  data->blafce = kernel.createFunction("bla",{"testString"},"string");
 }
 
 void Data::deinit(Data*data){
