@@ -4,11 +4,13 @@ PROJECT(AntTest)
 
 set(INCLUDES
   include/VariableRegisterManipulator.h
+  include/RegisterKeyboard.h
   )
 
 set(SOURCES
   src/main.cpp
   src/VariableRegisterManipulator.cpp
+  src/RegisterKeyboard.cpp
   )
 
 include_directories(include /usr/local/include)

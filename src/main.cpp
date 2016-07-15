@@ -19,6 +19,12 @@
 #include<assimp/postprocess.h>
 
 #include<glm/glm.hpp>
+#include<glm/gtc/matrix_transform.hpp>
+#include<glm/gtc/type_ptr.hpp>
+#include<glm/gtc/matrix_access.hpp>
+
+
+#include<RegisterKeyboard.h>
 
 struct Data{
   ge::de::Kernel kernel;
@@ -66,24 +72,22 @@ struct Data{
   };
 
   std::shared_ptr<ge::de::Resource>model = nullptr;
-  std::shared_ptr<ge::de::Function>prg = nullptr;
+  //std::shared_ptr<ge::de::Statement>prg = nullptr;
+  //std::shared_ptr<ge::de::Function>prg = nullptr;
+  std::shared_ptr<ge::de::Statement>prg2 = nullptr;
   std::shared_ptr<ge::de::Function>blafce = nullptr;
 };
 
+
 namespace ge{
   namespace de{
-    template<>
-      std::string TypeRegister::getTypeKeyword<aiScene const*>(){
-        return "AssimpScene";
-      }
-    template<>
-      std::string TypeRegister::getTypeKeyword<std::shared_ptr<ge::gl::Shader>>(){
-        return "SharedShader";
-      }
-    template<>
-      std::string TypeRegister::getTypeKeyword<std::shared_ptr<ge::gl::Program>>(){
-        return "SharedProgram";
-      }
+    GE_DE_ADD_KEYWORD(aiScene const*,"AssimpScene")
+    GE_DE_ADD_KEYWORD(std::shared_ptr<ge::gl::Shader>,"SharedShader")
+    GE_DE_ADD_KEYWORD(std::shared_ptr<ge::gl::Program>,"SharedProgram")
+    GE_DE_ADD_KEYWORD(glm::vec3,"vec3")
+    GE_DE_ADD_KEYWORD(glm::vec4,"vec4")
+    GE_DE_ADD_KEYWORD(glm::mat3,"mat3")
+    GE_DE_ADD_KEYWORD(glm::mat4,"mat4")
   }
 }
 
@@ -96,6 +100,18 @@ std::string concatenate(std::string a,std::string b){
   return a+b;
 }
 
+glm::vec3 addOneToX(glm::vec3 const& a){
+  return glm::vec3(1.f,0.f,0.f)+a;
+}
+
+glm::vec3 addOneToXIf(glm::vec3 a,bool trigger){
+  if(!trigger)return a;
+  return glm::vec3(1.f,0.f,0.f)+a;
+}
+
+bool addOneToXIfSignaling(glm::vec3,bool trigger){
+  return trigger;
+}
 
 std::string shaderSourceLoader(
     std::string version,
@@ -165,12 +181,14 @@ void Data::IdleCallback::operator()(){
   this->data->gl->glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
   this->data->emptyVAO->bind();
-  (*this->data->prg)();
-  (*(std::shared_ptr<ge::gl::Program>*)*this->data->prg->getOutputData())->use();
+  //(*this->data->prg)();
+  (*this->data->prg2)();
+  (*(std::shared_ptr<ge::gl::Program>*)*this->data->prg2->toBody()->at(0)->toFunction()->getOutputData())->use();
   this->data->gl->glDrawArrays(GL_TRIANGLE_STRIP,0,3);
   this->data->emptyVAO->unbind();
 
   (*this->data->blafce)();
+
 
   TwDraw();
   this->data->window->swap();
@@ -193,21 +211,11 @@ bool Data::WindowEventHandler::operator()(ge::util::EventDataPointer const&event
   return false;
 }
 
-std::string keyName(int key){
-  if(key==SDLK_PERIOD)return "period";
-  if(key==SDLK_KP_PERIOD)return "Keypad period";
-  if(key==SDLK_QUOTE)return "quote";
-  if(key==SDLK_BACKQUOTE)return "backquote";
-  if(key==SDLK_QUOTEDBL)return "quotedbl";
-  if(key==SDLK_ASTERISK)return "asterisk";
-  return SDL_GetKeyName(key);
-}
-
 bool Data::KeyDownCallback::operator()(ge::util::EventDataPointer const&event){
   auto sdlEventData = (ge::util::SDLEventData const*)(event);
   std::stringstream ss;
   ss<<"keyboard.";
-  ss<<keyName(sdlEventData->event.key.keysym.sym);
+  ss<<keyboard::keyName(sdlEventData->event.key.keysym.sym);
   auto &kernel = this->data->kernel;
   if(kernel.variableRegister->hasVariable(ss.str()))
     kernel.variableRegister->getVariable(ss.str())->update(true);
@@ -218,7 +226,7 @@ bool Data::KeyUpCallback::operator()(ge::util::EventDataPointer const&event){
   auto sdlEventData = (ge::util::SDLEventData const*)(event);
   std::stringstream ss;
   ss<<"keyboard.";
-  ss<<keyName(sdlEventData->event.key.keysym.sym);
+  ss<<keyboard::keyName(sdlEventData->event.key.keysym.sym);
   auto &kernel = this->data->kernel;
   if(kernel.variableRegister->hasVariable(ss.str()))
     kernel.variableRegister->getVariable(ss.str())->update(false);
@@ -231,11 +239,10 @@ std::string bla(std::string str){
   return str;
 }
 
-namespace ge{
-  namespace de{
-    template<>inline std::string TypeRegister::getTypeKeyword<glm::vec3>(){return "vec3";}
-  }
-}
+class GL: public ge::gl::opengl::FunctionProvider{
+  public:
+    GL():FunctionProvider(){}
+};
 
 void Data::init(Data*data){
   data->window->makeCurrent("rendering");
@@ -272,9 +279,11 @@ void Data::init(Data*data){
   kernel.addFunction({"createProgram2","shaderProgram","shader0","shader1"},createProgram2);
   kernel.addFunction({"bla","output","input"},bla);
 
+  kernel.addFunction({"addOneToX","output","input"},addOneToX);
 
+  kernel.addFunction({"addOneToXIf","output","input"},addOneToXIf,addOneToXIfSignaling);
   //script part
-  auto fceLoader = kernel.createFunction("assimpLoader",{"modelFile"},"AssimpScene");
+  auto fceLoader = kernel.createFunction("assimpLoader",{"modelFile"});
 
   (*fceLoader)();
   std::cout<<(*((aiScene const**)*fceLoader->getOutputData()))->mNumMeshes<<std::endl;
@@ -302,263 +311,38 @@ void Data::init(Data*data){
   auto fac = kernel.createCompositeFunctionFactory("createVSFSProgram",c,{{a,b},{a,b},{a},{a},{b},{b}},{{0,0},{2,2},{1},{3},{1},{3}});
   kernel.addCompositeFunction({"sharedProgram","version","vsDefines","vertexSourceFiles","fsDefines","fragmentSourceFiles"},fac);
 
-  data->prg = kernel.createFunction("createVSFSProgram",{"program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"},"SharedProgram");
+  //data->prg = kernel.createFunction("createVSFSProgram",{"program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"});
+
 
   kernel.addArrayType("vec3",3,"f32");
+  kernel.addArrayType("mat4",16,"f32");
 
   //kernel.addVariable("camera.position",kernel.createResource("vec3"));
 
   kernel.addVariable("camera.position",glm::vec3(10.f));
-  const int keys[]={
-    SDLK_RETURN,
-    SDLK_ESCAPE,
-    SDLK_BACKSPACE,
-    SDLK_TAB,
-    SDLK_SPACE,
-    SDLK_EXCLAIM,
-    SDLK_QUOTEDBL,
-    SDLK_HASH,
-    SDLK_PERCENT,
-    SDLK_DOLLAR,
-    SDLK_AMPERSAND,
-    SDLK_QUOTE,
-    SDLK_LEFTPAREN,
-    SDLK_RIGHTPAREN,
-    SDLK_ASTERISK,
-    SDLK_PLUS,
-    SDLK_COMMA,
-    SDLK_MINUS,
-    SDLK_PERIOD,
-    SDLK_SLASH,
-    SDLK_0,
-    SDLK_1,
-    SDLK_2,
-    SDLK_3,
-    SDLK_4,
-    SDLK_5,
-    SDLK_6,
-    SDLK_7,
-    SDLK_8,
-    SDLK_9,
-    SDLK_COLON,
-    SDLK_SEMICOLON,
-    SDLK_LESS,
-    SDLK_EQUALS,
-    SDLK_GREATER,
-    SDLK_QUESTION,
-    SDLK_AT,
-    SDLK_LEFTBRACKET,
-    SDLK_BACKSLASH,
-    SDLK_RIGHTBRACKET,
-    SDLK_CARET,
-    SDLK_UNDERSCORE,
-    SDLK_BACKQUOTE,
-    SDLK_a,
-    SDLK_b,
-    SDLK_c,
-    SDLK_d,
-    SDLK_e,
-    SDLK_f,
-    SDLK_g,
-    SDLK_h,
-    SDLK_i,
-    SDLK_j,
-    SDLK_k,
-    SDLK_l,
-    SDLK_m,
-    SDLK_n,
-    SDLK_o,
-    SDLK_p,
-    SDLK_q,
-    SDLK_r,
-    SDLK_s,
-    SDLK_t,
-    SDLK_u,
-    SDLK_v,
-    SDLK_w,
-    SDLK_x,
-    SDLK_y,
-    SDLK_z,
-    SDLK_CAPSLOCK,
-    SDLK_F1,
-    SDLK_F2,
-    SDLK_F3,
-    SDLK_F4,
-    SDLK_F5,
-    SDLK_F6,
-    SDLK_F7,
-    SDLK_F8,
-    SDLK_F9,
-    SDLK_F10,
-    SDLK_F11,
-    SDLK_F12,
-    SDLK_PRINTSCREEN,
-    SDLK_SCROLLLOCK,
-    SDLK_PAUSE,
-    SDLK_INSERT,
-    SDLK_HOME,
-    SDLK_PAGEUP,
-    SDLK_DELETE,
-    SDLK_END,
-    SDLK_PAGEDOWN,
-    SDLK_RIGHT,
-    SDLK_LEFT,
-    SDLK_DOWN,
-    SDLK_UP,
-    SDLK_NUMLOCKCLEAR,
-    SDLK_KP_DIVIDE,
-    SDLK_KP_MULTIPLY,
-    SDLK_KP_MINUS,
-    SDLK_KP_PLUS,
-    SDLK_KP_ENTER,
-    SDLK_KP_1,
-    SDLK_KP_2,
-    SDLK_KP_3,
-    SDLK_KP_4,
-    SDLK_KP_5,
-    SDLK_KP_6,
-    SDLK_KP_7,
-    SDLK_KP_8,
-    SDLK_KP_9,
-    SDLK_KP_0,
-    SDLK_KP_PERIOD,
-    SDLK_APPLICATION,
-    SDLK_POWER,
-    SDLK_KP_EQUALS,
-    SDLK_F13,
-    SDLK_F14,
-    SDLK_F15,
-    SDLK_F16,
-    SDLK_F17,
-    SDLK_F18,
-    SDLK_F19,
-    SDLK_F20,
-    SDLK_F21,
-    SDLK_F22,
-    SDLK_F23,
-    SDLK_F24,
-    SDLK_EXECUTE,
-    SDLK_HELP,
-    SDLK_MENU,
-    SDLK_SELECT,
-    SDLK_STOP,
-    SDLK_AGAIN,
-    SDLK_UNDO,
-    SDLK_CUT,
-    SDLK_COPY,
-    SDLK_PASTE,
-    SDLK_FIND,
-    SDLK_MUTE,
-    SDLK_VOLUMEUP,
-    SDLK_VOLUMEDOWN,
-    SDLK_KP_COMMA,
-    SDLK_KP_EQUALSAS400,
-    SDLK_ALTERASE,
-    SDLK_SYSREQ,
-    SDLK_CANCEL,
-    SDLK_CLEAR,
-    SDLK_PRIOR,
-    SDLK_RETURN2,
-    SDLK_SEPARATOR,
-    SDLK_OUT,
-    SDLK_OPER,
-    SDLK_CLEARAGAIN,
-    SDLK_CRSEL,
-    SDLK_EXSEL,
-    SDLK_KP_00,
-    SDLK_KP_000,
-    SDLK_THOUSANDSSEPARATOR,
-    SDLK_DECIMALSEPARATOR,
-    SDLK_CURRENCYUNIT,
-    SDLK_CURRENCYSUBUNIT,
-    SDLK_KP_LEFTPAREN,
-    SDLK_KP_RIGHTPAREN,
-    SDLK_KP_LEFTBRACE,
-    SDLK_KP_RIGHTBRACE,
-    SDLK_KP_TAB,
-    SDLK_KP_BACKSPACE,
-    SDLK_KP_A,
-    SDLK_KP_B,
-    SDLK_KP_C,
-    SDLK_KP_D,
-    SDLK_KP_E,
-    SDLK_KP_F,
-    SDLK_KP_XOR,
-    SDLK_KP_POWER,
-    SDLK_KP_PERCENT,
-    SDLK_KP_LESS,
-    SDLK_KP_GREATER,
-    SDLK_KP_AMPERSAND,
-    SDLK_KP_DBLAMPERSAND,
-    SDLK_KP_VERTICALBAR,
-    SDLK_KP_DBLVERTICALBAR,
-    SDLK_KP_COLON,
-    SDLK_KP_HASH,
-    SDLK_KP_SPACE,
-    SDLK_KP_AT,
-    SDLK_KP_EXCLAM,
-    SDLK_KP_MEMSTORE,
-    SDLK_KP_MEMRECALL,
-    SDLK_KP_MEMCLEAR,
-    SDLK_KP_MEMADD,
-    SDLK_KP_MEMSUBTRACT,
-    SDLK_KP_MEMMULTIPLY,
-    SDLK_KP_MEMDIVIDE,
-    SDLK_KP_PLUSMINUS,
-    SDLK_KP_CLEAR,
-    SDLK_KP_CLEARENTRY,
-    SDLK_KP_BINARY,
-    SDLK_KP_OCTAL,
-    SDLK_KP_DECIMAL,
-    SDLK_KP_HEXADECIMAL,
-    SDLK_LCTRL,
-    SDLK_LSHIFT,
-    SDLK_LALT,
-    SDLK_LGUI,
-    SDLK_RCTRL,
-    SDLK_RSHIFT,
-    SDLK_RALT,
-    SDLK_RGUI,
-    SDLK_MODE,
-    SDLK_AUDIONEXT,
-    SDLK_AUDIOPREV,
-    SDLK_AUDIOSTOP,
-    SDLK_AUDIOPLAY,
-    SDLK_AUDIOMUTE,
-    SDLK_MEDIASELECT,
-    SDLK_WWW,
-    SDLK_MAIL,
-    SDLK_CALCULATOR,
-    SDLK_COMPUTER,
-    SDLK_AC_SEARCH,
-    SDLK_AC_HOME,
-    SDLK_AC_BACK,
-    SDLK_AC_FORWARD,
-    SDLK_AC_STOP,
-    SDLK_AC_REFRESH,
-    SDLK_AC_BOOKMARKS,
-    SDLK_BRIGHTNESSDOWN,
-    SDLK_BRIGHTNESSUP,
-    SDLK_DISPLAYSWITCH,
-    SDLK_KBDILLUMTOGGLE,
-    SDLK_KBDILLUMDOWN,
-    SDLK_KBDILLUMUP,
-    SDLK_EJECT,
-    SDLK_SLEEP,
-  };
 
 
-  for(size_t i=0;i<sizeof(keys)/sizeof(keys[0]);++i){
-    std::stringstream ss;
-    ss<<"keyboard.";
-    ss<<keyName(keys[i]);
-    kernel.addVariable(ss.str(),(bool)false);
-  }
+  kernel.addVariable("camera.fovy",glm::radians<float>(90.f));
+  kernel.addVariable("camera.near",1.f);
+  kernel.addVariable("camera.far",1000.f);
+  kernel.addVariable("camera.aspect",1.f);
+  kernel.addVariable("camera.projection",glm::mat4(1.f));
 
+  kernel.addFunction({"computeProjection","projectionMatrix","fovy","aspect","near","far"},glm::perspective<float>);
+
+
+
+  keyboard::registerKeyboard(&kernel);
+
+  data->prg2 = std::make_shared<ge::de::Body>();
+  data->prg2->toBody()->addStatement(kernel.createFunction("createVSFSProgram",{"program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"}));
+  data->prg2->toBody()->addStatement(kernel.createFunction("addOneToXIf",{"camera.position","keyboard.A"},"camera.position"));
+  data->prg2->toBody()->addStatement(kernel.createFunction("computeProjection",{"camera.fovy","camera.aspect","camera.near","camera.far"},"camera.projection"));
 
   data->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister);
 
-  data->blafce = kernel.createFunction("bla",{"testString"},"string");
+  data->blafce = kernel.createFunction("bla",{"testString"});
+
 }
 
 void Data::deinit(Data*data){
