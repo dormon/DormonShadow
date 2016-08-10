@@ -30,11 +30,11 @@ std::shared_ptr<Resource>address(
 template<typename T>
 void _get(const void*value,void*data){
   auto cd=(CallbackData*)data;
-  auto res = cd->_vr->getVariable(cd->_name)->getOutputData();
+  auto res = cd->_vr->getVariable(cd->_name);
   res = address(res,cd->_path);
   if((T&)(*res)!=*((T*)value)){
     (T&)(*res) = *((T*)value);
-    cd->_vr->getVariable(cd->_name)->setDirty();
+    res->updateTicks();
     //cd->_vr->getVariable(cd->_name)->update(*((T*)value));
   }
 }
@@ -42,7 +42,7 @@ void _get(const void*value,void*data){
 template<typename T>
 void _set(void*value,void*data){
   auto cd=(CallbackData*)data;
-  auto res = cd->_vr->getVariable(cd->_name)->getOutputData();
+  auto res = cd->_vr->getVariable(cd->_name);
   res = address(res,cd->_path);
   *((T*)value)=(T&)(*res);
   //*((T*)value)=(T&)(*cd->_vr->getVariable(cd->_name)->getOutputData());
@@ -51,12 +51,12 @@ void _set(void*value,void*data){
 void TW_CALL _getString(const void *value, void * clientData){
   auto cd=(CallbackData*)clientData;
   const std::string *srcPtr = static_cast<const std::string *>(value);
-  auto res = cd->_vr->getVariable(cd->_name)->getOutputData();
+  auto res = cd->_vr->getVariable(cd->_name);
   res = address(res,cd->_path);
 
   if((std::string&)(*res)!=*((std::string*)srcPtr)){
     (std::string&)(*res) = *((std::string*)srcPtr);
-    cd->_vr->getVariable(cd->_name)->setDirty();
+    res->updateTicks();
     //cd->_vr->getVariable(cd->_name)->update(*((std::string*)srcPtr));
   }
 }
@@ -64,7 +64,7 @@ void TW_CALL _getString(const void *value, void * clientData){
 void TW_CALL _setString(void *value, void * clientData){
   auto cd=(CallbackData*)clientData;
   std::string *destPtr = static_cast<std::string *>(value);
-  auto res = cd->_vr->getVariable(cd->_name)->getOutputData();
+  auto res = cd->_vr->getVariable(cd->_name);
   res = address(res,cd->_path);
   TwCopyStdStringToLibrary(*destPtr,(std::string&)(*res));
   //TwCopyStdStringToLibrary(*destPtr,(std::string&)(*cd->_vr->getVariable(cd->_name)->getOutputData()));
@@ -129,13 +129,13 @@ hasVariable = true
 
 bool VariableRegisterManipulator::_addVariable(
     std::string varName,
-    std::shared_ptr<Nullary>const&var,
+    std::shared_ptr<Resource>const&var,
     std::shared_ptr<VariableRegister>const&vr,
     std::string group,
     std::vector<size_t>&path,
-    TypeRegister::TypeId const&typeId){
+    TypeId const&typeId){
   bool hasVariable = false;
-  auto tr = var->getOutputData()->getManager();
+  auto tr = var->getManager();
   //auto type = tr->getTypeIdType(typeId);
   auto typeName = tr->getTypeIdName(typeId);
   std::string varFullName = stringer(vr->getFullName(),".",varName);
@@ -144,34 +144,34 @@ bool VariableRegisterManipulator::_addVariable(
   std::string varLabelName = varName;
   for(auto const&x:path)
     varLabelName = stringer(varLabelName,"[",toString(x),"]");
-  if(typeName == TypeRegister::getTypeKeyword<bool>()){
+  if(typeName == keyword<bool>()){
     CASE(bool,TW_TYPE_BOOLCPP);
   }
-  if(typeName == TypeRegister::getTypeKeyword<int8_t>()){
+  if(typeName == keyword<int8_t>()){
     CASE(int8_t,TW_TYPE_INT8);
   }
-  if(typeName == TypeRegister::getTypeKeyword<int16_t>()){
+  if(typeName == keyword<int16_t>()){
     CASE(int16_t,TW_TYPE_INT16);
   }
-  if(typeName == TypeRegister::getTypeKeyword<int32_t>()){
+  if(typeName == keyword<int32_t>()){
     CASE(int32_t,TW_TYPE_INT32);
   }
-  if(typeName == TypeRegister::getTypeKeyword<uint8_t>()){
+  if(typeName == keyword<uint8_t>()){
     CASE(uint8_t,TW_TYPE_UINT8);
   }
-  if(typeName == TypeRegister::getTypeKeyword<uint16_t>()){
+  if(typeName == keyword<uint16_t>()){
     CASE(uint16_t,TW_TYPE_UINT16);
   }
-  if(typeName == TypeRegister::getTypeKeyword<uint32_t>()){
+  if(typeName == keyword<uint32_t>()){
     CASE(uint32_t,TW_TYPE_UINT32);
   }
-  if(typeName == TypeRegister::getTypeKeyword<float>()){
+  if(typeName == keyword<float>()){
     CASE(float,TW_TYPE_FLOAT);
   }
-  if(typeName == TypeRegister::getTypeKeyword<double>()){
+  if(typeName == keyword<double>()){
     CASE(double,TW_TYPE_DOUBLE);
   }
-  if(typeName == TypeRegister::getTypeKeyword<std::string>()){
+  if(typeName == keyword<std::string>()){
     this->_callbackData.push_back(new CallbackData(varName,vr));
     TwAddVarCB(this->_bar,varFullName.c_str(),TW_TYPE_STDSTRING,
         _getString,
@@ -196,7 +196,7 @@ bool VariableRegisterManipulator::_addRegister(std::shared_ptr<VariableRegister>
     auto varName = x->first;
     auto var = x->second;
     std::vector<size_t>path;
-    hasVariable |= this->_addVariable(varName,var,vr,group,path,var->getOutputData()->getId());
+    hasVariable |= this->_addVariable(varName,var,vr,group,path,var->getId());
   }
   for(auto g=vr->registersBegin();g!=vr->registersEnd();++g){
     auto hv = this->_addRegister(g->second,vr->getFullName()+"."+g->first,notGroup);//vr->getName());

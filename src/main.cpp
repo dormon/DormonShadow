@@ -28,46 +28,46 @@
 
 struct Data{
   ge::de::Kernel kernel;
-  std::shared_ptr<ge::gl::opengl::FunctionProvider> gl                  = nullptr;
-  std::shared_ptr<ge::util::SDLEventProc>           mainLoop            = nullptr;
-  std::shared_ptr<ge::util::SDLWindow>              window              = nullptr;
-  std::shared_ptr<ge::gl::VertexArray>              emptyVAO            = nullptr;
-  std::shared_ptr<VariableRegisterManipulator>      variableManipulator = nullptr;
+  std::shared_ptr<ge::gl::Context>    gl       = nullptr;
+  std::shared_ptr<ge::ad::SDLMainLoop>mainLoop = nullptr;
+  std::shared_ptr<ge::ad::SDLWindow>  window   = nullptr;
+  std::shared_ptr<ge::gl::VertexArray>             emptyVAO            = nullptr;
+  std::shared_ptr<VariableRegisterManipulator>     variableManipulator = nullptr;
   static void init(Data*data);
   static void deinit(Data*data);
-  class IdleCallback: public ge::util::CallbackInterface{
+  class IdleCallback: public ge::ad::SDLCallbackInterface{
     public:
       Data*data;
       IdleCallback(Data*data){this->data = data;}
       virtual void operator()()override;
       virtual ~IdleCallback(){}
   };
-  class WindowEventCallback: public ge::util::EventCallbackInterface{
+  class WindowEventCallback: public ge::ad::SDLEventCallbackInterface{
     public:
       Data*data;
       WindowEventCallback(Data*data){this->data = data;}
-      virtual bool operator()(ge::util::EventDataPointer const&)override;
+      virtual bool operator()(SDL_Event const&)override;
       virtual ~WindowEventCallback(){}
   };
-  class WindowEventHandler: public ge::util::EventHandlerInterface{
+  class WindowEventHandler: public ge::ad::SDLEventHandlerInterface{
     public:
       Data*data;
       WindowEventHandler(Data*data){this->data = data;}
-      virtual bool operator()(ge::util::EventDataPointer const&)override;
+      virtual bool operator()(SDL_Event const&)override;
       virtual ~WindowEventHandler(){}
   };
-  class KeyDownCallback: public ge::util::EventCallbackInterface{
+  class KeyDownCallback: public ge::ad::SDLEventCallbackInterface{
     public:
       Data*data;
       KeyDownCallback(Data*data){this->data = data;}
-      virtual bool operator()(ge::util::EventDataPointer const&)override;
+      virtual bool operator()(SDL_Event const&)override;
       virtual ~KeyDownCallback(){}
   };
-  class KeyUpCallback: public ge::util::EventCallbackInterface{
+  class KeyUpCallback: public ge::ad::SDLEventCallbackInterface{
     public:
       Data*data;
       KeyUpCallback(Data*data){this->data = data;}
-      virtual bool operator()(ge::util::EventDataPointer const&)override;
+      virtual bool operator()(SDL_Event const&)override;
       virtual ~KeyUpCallback(){}
   };
 
@@ -76,24 +76,47 @@ struct Data{
   //std::shared_ptr<ge::de::Function>prg = nullptr;
   std::shared_ptr<ge::de::Statement>prg2 = nullptr;
   std::shared_ptr<ge::de::Function>blafce = nullptr;
+  std::shared_ptr<ge::de::Function>modelFce = nullptr;
 };
 
+class GL: public ge::gl::Context{
+  public:
+    GL():Context(){}
+};
+
+class AssimpModel{
+  public:
+    aiScene const*model = nullptr;
+    AssimpModel(aiScene const*m){
+      std::cout<<"AssimpModel::this: "<<this<<std::endl;
+      std::cout<<"AssimpModel::AssimpModel(): "<<m<<std::endl;
+      this->model = m;
+    }
+    ~AssimpModel(){
+      std::cout<<"AssimpModel::this: "<<this<<std::endl;
+      std::cout<<"AssimpModel::~AssimpModel(): "<<this->model<<std::endl;
+      if(this->model)aiReleaseImport(this->model);
+    }
+};
 
 namespace ge{
   namespace de{
-    GE_DE_ADD_KEYWORD(aiScene const*,"AssimpScene")
+    GE_DE_ADD_KEYWORD(std::shared_ptr<AssimpModel>,"SharedAssimpModel")
+    GE_DE_ADD_KEYWORD(ge::gl::Program,"Program")
     GE_DE_ADD_KEYWORD(std::shared_ptr<ge::gl::Shader>,"SharedShader")
     GE_DE_ADD_KEYWORD(std::shared_ptr<ge::gl::Program>,"SharedProgram")
-    GE_DE_ADD_KEYWORD(glm::vec3,"vec3")
-    GE_DE_ADD_KEYWORD(glm::vec4,"vec4")
-    GE_DE_ADD_KEYWORD(glm::mat3,"mat3")
-    GE_DE_ADD_KEYWORD(glm::mat4,"mat4")
+    GE_DE_ADD_KEYWORD(glm::vec3,ge::de::keyword<float[3]>())
+    GE_DE_ADD_KEYWORD(glm::vec4,ge::de::keyword<float[4]>())
+    GE_DE_ADD_KEYWORD(glm::mat3,ge::de::keyword<float[3][3]>())
+    GE_DE_ADD_KEYWORD(glm::mat4,ge::de::keyword<float[4][4]>())
+    GE_DE_ADD_KEYWORD(GL,"GL")
   }
 }
 
-aiScene const*assimpLoader(std::string name){
-  aiScene const* model = aiImportFile(name.c_str(),aiProcess_Triangulate|aiProcess_GenNormals|aiProcess_SortByPType);
-  return model;
+std::shared_ptr<AssimpModel>assimpLoader(std::string name){
+  auto model = aiImportFile(name.c_str(),aiProcess_Triangulate|aiProcess_GenNormals|aiProcess_SortByPType);
+  assert(model!=nullptr);
+  return std::make_shared<AssimpModel>(model);
 }
 
 std::string concatenate(std::string a,std::string b){
@@ -113,11 +136,13 @@ bool addOneToXIfSignaling(glm::vec3,bool trigger){
   return trigger;
 }
 
+
+
 std::string shaderSourceLoader(
-    std::string version,
-    std::string defines,
-    std::string dir,
-    std::string fileNames){
+    std::string const&version,
+    std::string const&defines,
+    std::string const&dir,
+    std::string const&fileNames){
   std::cout<<"("<<version<<"#"<<defines<<"#"<<dir<<"#"<<fileNames<<")"<<std::endl;
   std::stringstream ss;
   ss<<version;
@@ -160,12 +185,12 @@ int main(int argc,char*argv[]){
   ge::util::copyArgumentManager2VariableRegister(data.kernel.variableRegister,*argm,data.kernel.functionRegister);
   std::cout<<data.kernel.variableRegister->toStr(0,data.kernel.typeRegister)<<std::endl;
 
-  data.mainLoop = std::make_shared<ge::util::SDLEventProc>(true);
+  data.mainLoop = std::make_shared<ge::ad::SDLMainLoop>(true);
   data.mainLoop->setIdleCallback(std::make_shared<Data::IdleCallback>(&data));
   data.mainLoop->setEventHandler(std::make_shared<Data::WindowEventHandler>(&data));
 
-  data.window   = std::make_shared<ge::util::SDLWindow>();
-  data.window->createContext("rendering",450u,ge::util::SDLWindow::CORE,ge::util::SDLWindow::DEBUG);
+  data.window   = std::make_shared<ge::ad::SDLWindow>();
+  data.window->createContext("rendering",450u,ge::ad::SDLWindow::CORE,ge::ad::SDLWindow::DEBUG);
   data.window->setEventCallback(SDL_WINDOWEVENT,std::make_shared<Data::WindowEventCallback>(&data));
   data.window->setEventCallback(SDL_KEYDOWN,std::make_shared<Data::KeyDownCallback>(&data));
   data.window->setEventCallback(SDL_KEYUP  ,std::make_shared<Data::KeyUpCallback>(&data));
@@ -183,20 +208,24 @@ void Data::IdleCallback::operator()(){
   this->data->emptyVAO->bind();
   //(*this->data->prg)();
   (*this->data->prg2)();
-  (*(std::shared_ptr<ge::gl::Program>*)*this->data->prg2->toBody()->at(0)->toFunction()->getOutputData())->use();
+  auto&program = ((std::shared_ptr<ge::gl::Program>&)*this->data->prg2->toBody()->at(0)->toFunction()->getOutputData());
+  program->use();
+  //program->setMatrix4fv("projection",(float*)this->data->kernel.variable("camera.projection")->getData());
+  program->set3fv("position",(float*)this->data->kernel.variable("camera.position")->getData());
   this->data->gl->glDrawArrays(GL_TRIANGLE_STRIP,0,3);
   this->data->emptyVAO->unbind();
 
   (*this->data->blafce)();
 
+  (*this->data->modelFce)();
+  //std::cout<<((std::shared_ptr<AssimpModel>&)*this->data->modelFce->getOutputData())->model->mNumMeshes<<std::endl;
 
   TwDraw();
   this->data->window->swap();
 }
 
-bool Data::WindowEventCallback::operator()(ge::util::EventDataPointer const&event){
-  auto sdlEventData = (ge::util::SDLEventData const*)(event);
-  if(sdlEventData->event.window.event==SDL_WINDOWEVENT_CLOSE){
+bool Data::WindowEventCallback::operator()(SDL_Event const&event){
+  if(event.window.event==SDL_WINDOWEVENT_CLOSE){
     this->data->mainLoop->removeWindow("primaryWindow");
     return true;
   }
@@ -204,29 +233,26 @@ bool Data::WindowEventCallback::operator()(ge::util::EventDataPointer const&even
 }
 
 
-bool Data::WindowEventHandler::operator()(ge::util::EventDataPointer const&event){
-  auto sdlEventData = (ge::util::SDLEventData const*)(event);
-  bool handledByAnt = TwEventSDL(&sdlEventData->event,SDL_MAJOR_VERSION,SDL_MINOR_VERSION);
+bool Data::WindowEventHandler::operator()(SDL_Event const&event){
+  bool handledByAnt = TwEventSDL(&event,SDL_MAJOR_VERSION,SDL_MINOR_VERSION);
   if(handledByAnt)return true;
   return false;
 }
 
-bool Data::KeyDownCallback::operator()(ge::util::EventDataPointer const&event){
-  auto sdlEventData = (ge::util::SDLEventData const*)(event);
+bool Data::KeyDownCallback::operator()(SDL_Event const&event){
   std::stringstream ss;
   ss<<"keyboard.";
-  ss<<keyboard::keyName(sdlEventData->event.key.keysym.sym);
+  ss<<keyboard::keyName(event.key.keysym.sym);
   auto &kernel = this->data->kernel;
   if(kernel.variableRegister->hasVariable(ss.str()))
     kernel.variableRegister->getVariable(ss.str())->update(true);
   return true;
 }
 
-bool Data::KeyUpCallback::operator()(ge::util::EventDataPointer const&event){
-  auto sdlEventData = (ge::util::SDLEventData const*)(event);
+bool Data::KeyUpCallback::operator()(SDL_Event const&event){
   std::stringstream ss;
   ss<<"keyboard.";
-  ss<<keyboard::keyName(sdlEventData->event.key.keysym.sym);
+  ss<<keyboard::keyName(event.key.keysym.sym);
   auto &kernel = this->data->kernel;
   if(kernel.variableRegister->hasVariable(ss.str()))
     kernel.variableRegister->getVariable(ss.str())->update(false);
@@ -239,16 +265,11 @@ std::string bla(std::string str){
   return str;
 }
 
-class GL: public ge::gl::opengl::FunctionProvider{
-  public:
-    GL():FunctionProvider(){}
-};
-
 void Data::init(Data*data){
   data->window->makeCurrent("rendering");
 
-  ge::gl::init(std::make_shared<ge::gl::opengl::DefaultLoader>((ge::gl::opengl::GET_PROC_ADDRESS)SDL_GL_GetProcAddress));
-  data->gl = ge::gl::opengl::getDefaultFunctionProvider();
+  ge::gl::init(SDL_GL_GetProcAddress);
+  data->gl = ge::gl::getDefaultContext();
   ge::gl::setHighDebugMessage();
 
   data->gl->glEnable(GL_DEPTH_TEST);
@@ -262,15 +283,16 @@ void Data::init(Data*data){
   TwWindowSize(data->window->getWidth(),data->window->getHeight());
 
   auto &kernel = data->kernel;
-  //so part
   kernel.addAtomicType(
-      "AssimpScene",
-      sizeof(aiScene const*),
+      "SharedAssimpModel",
+      sizeof(std::shared_ptr<AssimpModel>),
       nullptr,
-      [](void*ptr){aiReleaseImport(*((aiScene const**)ptr));});
+      [](void*ptr){((std::shared_ptr<AssimpModel>*)ptr)->~shared_ptr();});
+
   kernel.addAtomicClass<std::shared_ptr<ge::gl::Shader>>("SharedShader");
   kernel.addAtomicClass<std::shared_ptr<ge::gl::Program>>("SharedProgram");
 
+  kernel.addAtomicType("GL",sizeof(GL),[](void*ptr){new(ptr)GL();},[](void*ptr){((GL*)ptr)->~GL();});
 
   kernel.addFunction({"assimpLoader","fileName"},assimpLoader);
   kernel.addFunction({"shaderSourceLoader","source","version","defines","dir","fileNames"},shaderSourceLoader);
@@ -283,10 +305,7 @@ void Data::init(Data*data){
 
   kernel.addFunction({"addOneToXIf","output","input"},addOneToXIf,addOneToXIfSignaling);
   //script part
-  auto fceLoader = kernel.createFunction("assimpLoader",{"modelFile"});
 
-  (*fceLoader)();
-  std::cout<<(*((aiScene const**)*fceLoader->getOutputData()))->mNumMeshes<<std::endl;
 
   kernel.addVariable("program.version"       ,std::string("#version 450\n"));
   kernel.addVariable("program.vertexShader"  ,std::string("vertex.vp")     );
@@ -316,10 +335,7 @@ void Data::init(Data*data){
 
   kernel.addArrayType("vec3",3,"f32");
   kernel.addArrayType("mat4",16,"f32");
-
-  //kernel.addVariable("camera.position",kernel.createResource("vec3"));
-
-  kernel.addVariable("camera.position",glm::vec3(10.f));
+  kernel.addVariable("camera.position",glm::vec3(0.f));
 
 
   kernel.addVariable("camera.fovy",glm::radians<float>(90.f));
@@ -328,11 +344,17 @@ void Data::init(Data*data){
   kernel.addVariable("camera.aspect",1.f);
   kernel.addVariable("camera.projection",glm::mat4(1.f));
 
+  kernel.addVariable("shaderDirectory",std::string("shaders/"));
+  kernel.addVariable("testString",std::string("ahoj"));
+  kernel.addVariable("modelFile",std::string("/media/windata/ft/prace/models/cube/cube.obj"));
+
   kernel.addFunction({"computeProjection","projectionMatrix","fovy","aspect","near","far"},glm::perspective<float>);
 
-
-
   keyboard::registerKeyboard(&kernel);
+
+  kernel.addEmptyVariable("gl","GL");
+  kernel.addVariable("transpose",(int32_t)GL_FALSE);
+  kernel.addVariable("nofMatrices",(uint32_t)1);
 
   data->prg2 = std::make_shared<ge::de::Body>();
   data->prg2->toBody()->addStatement(kernel.createFunction("createVSFSProgram",{"program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"}));
@@ -342,7 +364,7 @@ void Data::init(Data*data){
   data->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister);
 
   data->blafce = kernel.createFunction("bla",{"testString"});
-
+  data->modelFce = kernel.createFunction("assimpLoader",{"modelFile"});
 }
 
 void Data::deinit(Data*data){

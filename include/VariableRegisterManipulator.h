@@ -22,9 +22,9 @@ class VariableRegisterManipulator{
         std::string notGroup);
     bool _addVariable(
         std::string varName,
-        std::shared_ptr<ge::de::Nullary>const&var,
+        std::shared_ptr<ge::de::Resource>const&var,
         std::shared_ptr<ge::de::VariableRegister>const&vr,
         std::string group,
         std::vector<size_t>&path,
-        ge::de::TypeRegister::TypeId const&typeId);
+        ge::de::TypeId const&typeId);
 };
