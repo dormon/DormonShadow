@@ -77,11 +77,12 @@ struct Data{
   std::shared_ptr<ge::de::Function>modelFce = nullptr;
 };
 
+/*
 class GL: public ge::gl::Context{
   public:
     GL():Context(){}
 };
-
+*/
 class AssimpModel{
   public:
     aiScene const*model = nullptr;
@@ -104,7 +105,8 @@ namespace ge{
     GE_DE_ADD_KEYWORD(glm::vec4,ge::de::keyword<float[4]>())
     GE_DE_ADD_KEYWORD(glm::mat3,ge::de::keyword<float[3][3]>())
     GE_DE_ADD_KEYWORD(glm::mat4,ge::de::keyword<float[4][4]>())
-    GE_DE_ADD_KEYWORD(GL,"GL")
+    GE_DE_ADD_KEYWORD(ge::gl::Context,"GL")
+    //GE_DE_ADD_KEYWORD(GL,"GL")
   }
 }
 
@@ -163,10 +165,10 @@ void Data::IdleCallback::operator()(){
   //(*this->data->prg)();
   this->data->gl->glUseProgram(0);
   (*this->data->prg2)();
-  auto&program = ((std::shared_ptr<ge::gl::Program>&)*this->data->prg2->toBody()->at(0)->toFunction()->getOutputData());
+  //auto&program = ((std::shared_ptr<ge::gl::Program>&)*this->data->prg2->toBody()->at(0)->toFunction()->getOutputData());
   //program->use();
-  program->set3fv("position",(float*)this->data->kernel.variable("camera.position")->getData());
-  this->data->gl->glDrawArrays(GL_TRIANGLE_STRIP,0,3);
+  //program->set3fv("position",(float*)this->data->kernel.variable("camera.position")->getData());
+  //this->data->gl->glDrawArrays(GL_TRIANGLE_STRIP,0,3);
   this->data->emptyVAO->unbind();
 
   (*this->data->blafce)();
@@ -237,6 +239,7 @@ void Data::init(Data*data){
   TwWindowSize(data->window->getWidth(),data->window->getHeight());
 
   auto &kernel = data->kernel;
+  kernel.typeRegister->addType<float*>();
   registerPlugin(&kernel);
   kernel.addAtomicType(
       "SharedAssimpModel",
@@ -244,7 +247,8 @@ void Data::init(Data*data){
       nullptr,
       [](void*ptr){((std::shared_ptr<AssimpModel>*)ptr)->~shared_ptr();});
 
-  kernel.addAtomicType("GL",sizeof(GL),[](void*ptr){new(ptr)GL();},[](void*ptr){((GL*)ptr)->~GL();});
+  //kernel.addAtomicType("GL",sizeof(GL),[](void*ptr){new(ptr)GL();},[](void*ptr){((GL*)ptr)->~GL();});
+  kernel.addAtomicType("GL",sizeof(ge::gl::Context),[](void*ptr){new(ptr)ge::gl::Context();},[](void*ptr){((ge::gl::Context*)ptr)->~Context();});
 
   kernel.addFunction({"assimpLoader","fileName"},assimpLoader);
   kernel.addFunction({"bla","output","input"},bla);
@@ -267,11 +271,13 @@ void Data::init(Data*data){
   kernel.addVariable("shaderDirectory",std::string("shaders/"));
   kernel.addVariable("testString",std::string("ahoj"));
   kernel.addVariable("modelFile",std::string("/media/windata/ft/prace/models/cube/cube.obj"));
-  kernel.addEmptyVariable("gl","GL");
+  //kernel.addEmptyVariable("gl","GL");
   kernel.addVariable("transpose",(int32_t)GL_FALSE);
   kernel.addVariable("nofMatrices",(uint32_t)1);
+  kernel.addVariable("gl",ge::gl::Context{});
   keyboard::registerKeyboard(&kernel);
 
+  kernel.addFunction({"glDrawArrays","mode","first","count"},&ge::gl::Context::glDrawArrays);
   {
     auto a = kernel.createFunctionNodeFactory("shaderSourceLoader");
     auto b = kernel.createFunctionNodeFactory("shaderSourceLoader");
@@ -304,6 +310,19 @@ void Data::init(Data*data){
   usep->setIgnoreDirty(true);
   usep->setIgnoreInputChanges(true);
   data->prg2->toBody()->addStatement(usep);
+
+  auto set3fv = kernel.createFce("Program::set3fv",
+      kernel.createFce("sharedProgram2Program*",data->prg2->toBody()->at(0)->toFunction()->getOutputData()),
+      kernel.createVariable<std::string>("position"),
+      kernel.createFce("f32[3]2f32*","camera.position"),
+      kernel.createVariable<GLsizei>(1)
+      ); 
+  data->prg2->toBody()->addStatement(set3fv);
+
+  auto drawArrays = kernel.createFce("glDrawArrays","gl",kernel.createVariable<GLenum>(GL_TRIANGLE_STRIP),kernel.createVariable<GLint>(0),kernel.createVariable<GLsizei>(3));
+  drawArrays->setIgnoreDirty(true);
+  drawArrays->setIgnoreInputChanges(true);
+  data->prg2->toBody()->addStatement(drawArrays);
 
 
   data->prg2->toBody()->addStatement(kernel.createFce("addOneToXIf","camera.position","keyboard.A","camera.position"));

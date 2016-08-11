@@ -53,7 +53,7 @@ std::shared_ptr<ge::gl::Program>createProgram(
 }
 
 template<typename T>inline T*sharedPointerToPointer(std::shared_ptr<T>const&p){return &*p;}
-
+template<typename T,size_t N>inline T const*arrayToPointer(const T (&p)[N]){return &p[0];}
 int32_t neco(){
   return 10;
 }
@@ -85,6 +85,8 @@ void registerPlugin(Kernel*kernel){
 
 
   kernel->addFunction({"sharedProgram2Program*","program*","sharedProgram"},sharedPointerToPointer<ge::gl::Program>);
+  kernel->addFunction({"f32[3]2f32*","f32[3]","f32*"},arrayToPointer<float,3>);
   kernel->addFunction({"Program::use"},&ge::gl::Program::use);
-
+  kernel->addFunction({"Program::set3fv"},&ge::gl::Program::set3fv);
+  
 }
