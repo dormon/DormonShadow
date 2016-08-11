@@ -163,7 +163,7 @@ void Data::IdleCallback::operator()(){
 
   this->data->emptyVAO->bind();
   //(*this->data->prg)();
-  this->data->gl->glUseProgram(0);
+  //this->data->gl->glUseProgram(0);
   (*this->data->prg2)();
   //auto&program = ((std::shared_ptr<ge::gl::Program>&)*this->data->prg2->toBody()->at(0)->toFunction()->getOutputData());
   //program->use();
