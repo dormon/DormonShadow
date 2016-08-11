@@ -273,24 +273,24 @@ void Data::init(Data*data){
   keyboard::registerKeyboard(&kernel);
 
   {
-    auto a = kernel.createFunctionNodeFactory("vertexShaderSourceLoader","shaderSourceLoader");
-    auto b = kernel.createFunctionNodeFactory("fragmentShaderSourceLoader","shaderSourceLoader");
-    auto aa = kernel.createFunctionNodeFactory("createVertexShaderFromSource","createVertexShader",{a});
-    auto bb = kernel.createFunctionNodeFactory("createFragmentShaderFromSource","createFragmentShader",{b});
-    auto c = kernel.createFunctionNodeFactory("createProgramFromVertexFragment","createProgram2",{aa,bb});
-    auto fac = kernel.createCompositeFunctionFactory("createVSFSProgram",c,{{a,b},{a,b},{a},{a},{b},{b}},{{0,0},{2,2},{1},{3},{1},{3}});
-    kernel.addCompositeFunction({"sharedProgram","version","vsDefines","vertexSourceFiles","fsDefines","fragmentSourceFiles"},fac);
+    auto a = kernel.createFunctionNodeFactory("shaderSourceLoader");
+    auto b = kernel.createFunctionNodeFactory("shaderSourceLoader");
+    auto aa = kernel.createFunctionNodeFactory("createVertexShader",{a});
+    auto bb = kernel.createFunctionNodeFactory("createFragmentShader",{b});
+    auto c = kernel.createFunctionNodeFactory("createProgram2",{aa,bb});
+    auto fac = kernel.createCompositeFunctionFactory(c,{{a,b},{a,b},{a},{a},{b},{b}},{{0,0},{2,2},{1},{3},{1},{3}});
+    kernel.addCompositeFunction("createVSFSProgram",{"sharedProgram","version","vsDefines","vertexSourceFiles","fsDefines","fragmentSourceFiles"},fac);
   }
   {
-    auto a = kernel.createFunctionNodeFactory("vertexShaderSourceLoader","shaderSourceLoader");
-    auto b = kernel.createFunctionNodeFactory("geometryShaderSourceLoader","shaderSourceLoader");
-    auto c = kernel.createFunctionNodeFactory("fragmentShaderSourceLoader","shaderSourceLoader");
-    auto aa = kernel.createFunctionNodeFactory("createVertexShaderFromSource","createVertexShader",{a});
-    auto bb = kernel.createFunctionNodeFactory("createGeometryShaderFromSource","createGeometryShader",{b});
-    auto cc = kernel.createFunctionNodeFactory("createFragmentShaderFromSource","createFragmentShader",{c});
-    auto d = kernel.createFunctionNodeFactory("createProgramFromVSGSFS","createProgram3",{aa,bb,cc});
-    auto fac = kernel.createCompositeFunctionFactory("createVSGSFSProgram",d,{{a,b,c},{a,b,c},{a},{a},{b},{b},{c},{c}},{{0,0,0},{2,2,2},{1},{3},{1},{3},{1},{3}});
-    kernel.addCompositeFunction({"sharedProgram","version","vsDefines","vsSourceFiles","gsDefines","gsSourceFiles","fsDefines","fsSourceFiles"},fac);
+    auto a = kernel.createFunctionNodeFactory("shaderSourceLoader");
+    auto b = kernel.createFunctionNodeFactory("shaderSourceLoader");
+    auto c = kernel.createFunctionNodeFactory("shaderSourceLoader");
+    auto aa = kernel.createFunctionNodeFactory("createVertexShader",{a});
+    auto bb = kernel.createFunctionNodeFactory("createGeometryShader",{b});
+    auto cc = kernel.createFunctionNodeFactory("createFragmentShader",{c});
+    auto d = kernel.createFunctionNodeFactory("createProgram3",{aa,bb,cc});
+    auto fac = kernel.createCompositeFunctionFactory(d,{{a,b,c},{a,b,c},{a},{a},{b},{b},{c},{c}},{{0,0,0},{2,2,2},{1},{3},{1},{3},{1},{3}});
+    kernel.addCompositeFunction("createVSGSFSProgram",{"sharedProgram","version","vsDefines","vsSourceFiles","gsDefines","gsSourceFiles","fsDefines","fsSourceFiles"},fac);
   }
 
 
