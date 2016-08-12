@@ -197,6 +197,10 @@ int32_t clearMouseRel(){
   return 0;
 }
 
+uint32_t incrementFrameCounter(uint32_t counter){
+  return counter+1;
+}
+
 
 int main(int argc,char*argv[]){
   Data data;
@@ -362,6 +366,7 @@ void Data::init(Data*data){
   kernel.addVariable("testString"            ,std::string("ahoj"));
   kernel.addVariable("modelFile"             ,std::string("/media/windata/ft/prace/models/cube/cube.obj"));
   kernel.addVariable("gl"                    ,ge::gl::Context{});
+  kernel.addVariable("frameCounter"          ,(uint32_t)0);
   keyboard::registerKeyboard(&kernel);
   mouse::registerMouse(&kernel);
 
@@ -378,6 +383,7 @@ void Data::init(Data*data){
   kernel.addFunction({"cameraAddXRotation","angle","angle","sensitivity","rel","trigger"},cameraAddXRotation);
   kernel.addFunction({"cameraAddYRotation","angle","angle","sensitivity","rel","trigger"},cameraAddYRotation);
   kernel.addFunction({"clearMouseRel","zero"},clearMouseRel);
+  kernel.addFunction({"incrementFrameCounter","counter","counter"},incrementFrameCounter);
   {
     auto a = kernel.createFunctionNodeFactory("shaderSourceLoader");
     auto b = kernel.createFunctionNodeFactory("shaderSourceLoader");
@@ -472,6 +478,7 @@ void Data::init(Data*data){
 
   //data->prg2->toBody()->addStatement(kernel.createFce("addOneToXIf","camera.position","keyboard.A","camera.position"));
   data->prg2->toBody()->addStatement(kernel.createFce("computeProjection","camera.fovy","camera.aspect","camera.near","camera.far","camera.projection"));
+  data->prg2->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
   data->prg2->setIgnoreDirty(true);
 
   data->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister);
