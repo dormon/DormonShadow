@@ -12,7 +12,6 @@
 
 #include<AntTweakBar.h>
 
-#include"../include/VariableRegisterManipulator.h"
 
 #include<assimp/cimport.h>
 #include<assimp/scene.h>
@@ -24,6 +23,7 @@
 #include<glm/gtc/matrix_access.hpp>
 
 
+#include<VariableRegisterManipulator.h>
 #include<RegisterKeyboard.h>
 #include<RegisterMouse.h>
 #include<Functions.h>
@@ -125,13 +125,6 @@ int32_t clearMouseRel(){return 0;}
 uint32_t incrementFrameCounter(uint32_t counter){return counter+1;}
 
 
-int main(int argc,char*argv[]){
-  Application app;
-  if(!app.init(argc,argv))return EXIT_FAILURE;
-  (*app.mainLoop)();
-  return EXIT_SUCCESS;
-}
-
 void Application::idle(void*d){
   auto app = (Application*)d;
   app->gl->glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
@@ -144,47 +137,6 @@ void Application::idle(void*d){
   (*app->modelFce)();
   TwDraw();
   app->window->swap();
-}
-
-bool Application::eventHandler(SDL_Event const&event,void*){
-  bool handledByAnt = TwEventSDL(&event,SDL_MAJOR_VERSION,SDL_MINOR_VERSION);
-  if(handledByAnt)return true;
-  return false;
-}
-
-template<bool DOWN>
-bool Application::key(SDL_Event const&event,void*d){
-  auto app = (Application*)d;
-  auto name = keyboard::fullKeyName(event.key.keysym.sym);
-  auto &kernel = app->kernel;
-  if(kernel.variableRegister->hasVariable(name))
-    kernel.variableRegister->getVariable(name)->update(DOWN);
-  return true;
-}
-
-template<bool DOWN>
-bool Application::mouseButton(SDL_Event const&event,void*d){
-  auto app = (Application*)d;
-  auto name = mouse::fullButtonName(event.button.button);
-  auto &kernel = app->kernel;
-  if(kernel.variableRegister->hasVariable(name))
-    kernel.variableRegister->getVariable(name)->update(DOWN);
-  return true;
-}
-
-bool Application::mouseMotion(SDL_Event const&event,void*d){
-  auto app = (Application*)d;
-  auto &kernel = app->kernel;
-  if(kernel.variableRegister->hasVariable("mouse.x"))
-    kernel.variableRegister->getVariable("mouse.x")->update(event.motion.x);
-  if(kernel.variableRegister->hasVariable("mouse.y"))
-    kernel.variableRegister->getVariable("mouse.y")->update(event.motion.y);
-  if(kernel.variableRegister->hasVariable("mouse.xrel"))
-    kernel.variableRegister->getVariable("mouse.xrel")->update(event.motion.xrel);
-  if(kernel.variableRegister->hasVariable("mouse.yrel"))
-    kernel.variableRegister->getVariable("mouse.yrel")->update(event.motion.yrel);
-  return true;
-
 }
 
 std::string bla(std::string str){
@@ -380,6 +332,57 @@ bool Application::init(int argc,char*argv[]){
   this->blafce = kernel.createFce("bla","testString");
   this->modelFce = kernel.createFce("assimpLoader","modelFile");
   return true;
+}
+
+
+
+
+int main(int argc,char*argv[]){
+  Application app;
+  if(!app.init(argc,argv))return EXIT_FAILURE;
+  (*app.mainLoop)();
+  return EXIT_SUCCESS;
+}
+
+bool Application::eventHandler(SDL_Event const&event,void*){
+  bool handledByAnt = TwEventSDL(&event,SDL_MAJOR_VERSION,SDL_MINOR_VERSION);
+  if(handledByAnt)return true;
+  return false;
+}
+
+template<bool DOWN>
+bool Application::key(SDL_Event const&event,void*d){
+  auto app = (Application*)d;
+  auto name = keyboard::fullKeyName(event.key.keysym.sym);
+  auto &kernel = app->kernel;
+  if(kernel.variableRegister->hasVariable(name))
+    kernel.variableRegister->getVariable(name)->update(DOWN);
+  return true;
+}
+
+template<bool DOWN>
+bool Application::mouseButton(SDL_Event const&event,void*d){
+  auto app = (Application*)d;
+  auto name = mouse::fullButtonName(event.button.button);
+  auto &kernel = app->kernel;
+  if(kernel.variableRegister->hasVariable(name))
+    kernel.variableRegister->getVariable(name)->update(DOWN);
+  return true;
+}
+
+bool Application::mouseMotion(SDL_Event const&event,void*d){
+  auto app = (Application*)d;
+  auto &kernel = app->kernel;
+  if(kernel.variableRegister->hasVariable("mouse.x"))
+    kernel.variableRegister->getVariable("mouse.x")->update(event.motion.x);
+  if(kernel.variableRegister->hasVariable("mouse.y"))
+    kernel.variableRegister->getVariable("mouse.y")->update(event.motion.y);
+  if(kernel.variableRegister->hasVariable("mouse.xrel"))
+    kernel.variableRegister->getVariable("mouse.xrel")->update(event.motion.xrel);
+  if(kernel.variableRegister->hasVariable("mouse.yrel"))
+    kernel.variableRegister->getVariable("mouse.yrel")->update(event.motion.yrel);
+  return true;
+
 }
 
 Application::~Application(){
