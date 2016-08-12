@@ -12,6 +12,12 @@ std::string keyboard::keyName(int key){
   return SDL_GetKeyName(key);
 }
 
+std::string keyboard::fullKeyName(int key){
+  std::stringstream ss;
+  ss<<"keyboard."<<keyName(key);
+  return ss.str();
+}
+
 void keyboard::registerKeyboard(ge::de::Kernel*kernel){
   const int keys[]={
     SDLK_RETURN,
@@ -250,12 +256,6 @@ void keyboard::registerKeyboard(ge::de::Kernel*kernel){
     SDLK_EJECT,
     SDLK_SLEEP,
   };
-  for(size_t i=0;i<sizeof(keys)/sizeof(keys[0]);++i){
-    std::stringstream ss;
-    ss<<"keyboard.";
-    ss<<keyName(keys[i]);
-    kernel->addVariable(ss.str(),(bool)false);
-  }
-
-
+  for(auto const&x:keys)
+    kernel->addVariable(fullKeyName(x),(bool)false);
 }

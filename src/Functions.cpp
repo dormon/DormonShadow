@@ -86,7 +86,9 @@ void registerPlugin(Kernel*kernel){
 
   kernel->addFunction({"sharedProgram2Program*","program*","sharedProgram"},sharedPointerToPointer<ge::gl::Program>);
   kernel->addFunction({"f32[3]2f32*","f32[3]","f32*"},arrayToPointer<float,3>);
+  kernel->addFunction({"f32[16]2f32*","f32[16]","f32*"},arrayToPointer<float,16>);
   kernel->addFunction({"Program::use"},&ge::gl::Program::use);
   kernel->addFunction({"Program::set3fv"},&ge::gl::Program::set3fv);
+  kernel->addFunction({"Program::setMatrix4fv"},&ge::gl::Program::setMatrix4fv);
   
 }

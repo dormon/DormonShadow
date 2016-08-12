@@ -5,6 +5,7 @@ PROJECT(AntTest)
 set(INCLUDES
   include/VariableRegisterManipulator.h
   include/RegisterKeyboard.h
+  include/RegisterMouse.h
   include/Functions.h
   )
 
@@ -12,6 +13,7 @@ set(SOURCES
   src/main.cpp
   src/VariableRegisterManipulator.cpp
   src/RegisterKeyboard.cpp
+  src/RegisterMouse.cpp
   src/Functions.cpp
   )
 

@@ -31,9 +31,9 @@ template<typename T>
 void _get(const void*value,void*data){
   auto cd=(CallbackData*)data;
   auto res = cd->_vr->getVariable(cd->_name);
-  res = address(res,cd->_path);
-  if((T&)(*res)!=*((T*)value)){
-    (T&)(*res) = *((T*)value);
+  auto res2 = address(res,cd->_path);
+  if((T&)(*res2)!=*((T*)value)){
+    (T&)(*res2) = *((T*)value);
     res->updateTicks();
     //cd->_vr->getVariable(cd->_name)->update(*((T*)value));
   }
