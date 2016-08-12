@@ -28,76 +28,25 @@
 #include<RegisterMouse.h>
 #include<Functions.h>
 
-struct Data{
+struct Application{
   ge::de::Kernel kernel;
   std::shared_ptr<ge::gl::Context>            gl                  = nullptr;
   std::shared_ptr<ge::ad::SDLMainLoop>        mainLoop            = nullptr;
   std::shared_ptr<ge::ad::SDLWindow>          window              = nullptr;
   std::shared_ptr<ge::gl::VertexArray>        emptyVAO            = nullptr;
   std::shared_ptr<VariableRegisterManipulator>variableManipulator = nullptr;
-  static void init(Data*data);
-  static void deinit(Data*data);
-  class IdleCallback: public ge::ad::SDLCallbackInterface{
-    public:
-      Data*data;
-      IdleCallback(Data*data){this->data = data;}
-      virtual void operator()()override;
-      virtual ~IdleCallback(){}
-  };
-  class WindowEventCallback: public ge::ad::SDLEventCallbackInterface{
-    public:
-      Data*data;
-      WindowEventCallback(Data*data){this->data = data;}
-      virtual bool operator()(SDL_Event const&)override;
-      virtual ~WindowEventCallback(){}
-  };
-  class WindowEventHandler: public ge::ad::SDLEventHandlerInterface{
-    public:
-      Data*data;
-      WindowEventHandler(Data*data){this->data = data;}
-      virtual bool operator()(SDL_Event const&)override;
-      virtual ~WindowEventHandler(){}
-  };
-  class KeyDownCallback: public ge::ad::SDLEventCallbackInterface{
-    public:
-      Data*data;
-      KeyDownCallback(Data*data){this->data = data;}
-      virtual bool operator()(SDL_Event const&)override;
-      virtual ~KeyDownCallback(){}
-  };
-  class KeyUpCallback: public ge::ad::SDLEventCallbackInterface{
-    public:
-      Data*data;
-      KeyUpCallback(Data*data){this->data = data;}
-      virtual bool operator()(SDL_Event const&)override;
-      virtual ~KeyUpCallback(){}
-  };
-  class MouseButtonDownCallback: public ge::ad::SDLEventCallbackInterface{
-    public:
-      Data*data;
-      MouseButtonDownCallback(Data*data){this->data = data;}
-      virtual bool operator()(SDL_Event const&)override;
-      virtual ~MouseButtonDownCallback(){}
-  };
-  class MouseButtonUpCallback: public ge::ad::SDLEventCallbackInterface{
-    public:
-      Data*data;
-      MouseButtonUpCallback(Data*data){this->data = data;}
-      virtual bool operator()(SDL_Event const&)override;
-      virtual ~MouseButtonUpCallback(){}
-  };
-  class MouseMotionCallback: public ge::ad::SDLEventCallbackInterface{
-    public:
-      Data*data;
-      MouseMotionCallback(Data*data){this->data = data;}
-      virtual bool operator()(SDL_Event const&)override;
-      virtual ~MouseMotionCallback(){}
-  };
-
-
-  std::shared_ptr<ge::de::Statement>prg2 = nullptr;
-  std::shared_ptr<ge::de::Function>blafce = nullptr;
-  std::shared_ptr<ge::de::Function>modelFce = nullptr;
+  std::shared_ptr<ge::de::Statement>          prg2                = nullptr;
+  std::shared_ptr<ge::de::Function>           blafce              = nullptr;
+  std::shared_ptr<ge::de::Function>           modelFce            = nullptr;
+  ~Application();
+  bool init(int argc,char*argv[]);
+  static void idle(void*);
+  static bool eventHandler(SDL_Event const&,void*);
+  template<bool DOWN>
+    static bool key(SDL_Event const&,void*);
+  template<bool DOWN>
+    static bool mouseButton(SDL_Event const&,void*);
+  static bool mouseMotion(SDL_Event const&,void*);
 };
 
 class AssimpModel{
@@ -152,34 +101,12 @@ glm::mat4 computeView(glm::mat4 const&viewRotation,glm::vec3 const&pos){
   return viewRotation*glm::translate(glm::mat4(1.f),-pos);
 }
 
-glm::vec3 cameraForward(glm::mat4 const&viewRotation,glm::vec3 const&pos,float speed,bool trigger){
-  if(!trigger)return pos;
-  return pos-speed*glm::vec3(glm::row(viewRotation,2));
+bool cameraMoveTrigger(glm::mat4 const&,glm::vec3 const&,float,int32_t,bool trigger){
+  return trigger;
 }
 
-glm::vec3 cameraBack(glm::mat4 const&viewRotation,glm::vec3 const&pos,float speed,bool trigger){
-  if(!trigger)return pos;
-  return pos+speed*glm::vec3(glm::row(viewRotation,2));
-}
-
-glm::vec3 cameraLeft(glm::mat4 const&viewRotation,glm::vec3 const&pos,float speed,bool trigger){
-  if(!trigger)return pos;
-  return pos-speed*glm::vec3(glm::row(viewRotation,0));
-}
-
-glm::vec3 cameraRight(glm::mat4 const&viewRotation,glm::vec3 const&pos,float speed,bool trigger){
-  if(!trigger)return pos;
-  return pos+speed*glm::vec3(glm::row(viewRotation,0));
-}
-
-glm::vec3 cameraUp(glm::mat4 const&viewRotation,glm::vec3 const&pos,float speed,bool trigger){
-  if(!trigger)return pos;
-  return pos+speed*glm::vec3(glm::row(viewRotation,1));
-}
-
-glm::vec3 cameraDown(glm::mat4 const&viewRotation,glm::vec3 const&pos,float speed,bool trigger){
-  if(!trigger)return pos;
-  return pos-speed*glm::vec3(glm::row(viewRotation,1));
+glm::vec3 cameraMove(glm::mat4 const&viewRotation,glm::vec3 const&pos,float speed,int32_t direction,bool){
+  return pos+glm::sign(direction)*speed*glm::vec3(glm::row(viewRotation,glm::abs(direction)-1));
 }
 
 float cameraAddXRotation(float angle,float sensitivity,int32_t rel,bool trigger){
@@ -193,103 +120,61 @@ float cameraAddYRotation(float angle,float sensitivity,int32_t rel,bool trigger)
   return angle+rel*sensitivity;
 }
 
-int32_t clearMouseRel(){
-  return 0;
-}
+int32_t clearMouseRel(){return 0;}
 
-uint32_t incrementFrameCounter(uint32_t counter){
-  return counter+1;
-}
+uint32_t incrementFrameCounter(uint32_t counter){return counter+1;}
 
 
 int main(int argc,char*argv[]){
-  Data data;
-  auto argm = std::make_shared<ge::util::ArgumentManager>(argc-1,argv+1);
-  ge::util::copyArgumentManager2VariableRegister(data.kernel.variableRegister,*argm,data.kernel.functionRegister);
-  std::cout<<data.kernel.variableRegister->toStr(0,data.kernel.typeRegister)<<std::endl;
-
-  data.mainLoop = std::make_shared<ge::ad::SDLMainLoop>(true);
-  data.mainLoop->setIdleCallback(std::make_shared<Data::IdleCallback>(&data));
-  data.mainLoop->setEventHandler(std::make_shared<Data::WindowEventHandler>(&data));
-
-  data.window   = std::make_shared<ge::ad::SDLWindow>();
-  data.window->createContext("rendering",450u,ge::ad::SDLWindow::CORE,ge::ad::SDLWindow::DEBUG);
-  data.window->setEventCallback(SDL_WINDOWEVENT    ,std::make_shared<Data::WindowEventCallback>(&data));
-  data.window->setEventCallback(SDL_KEYDOWN        ,std::make_shared<Data::KeyDownCallback>(&data));
-  data.window->setEventCallback(SDL_KEYUP          ,std::make_shared<Data::KeyUpCallback>(&data));
-  data.window->setEventCallback(SDL_MOUSEBUTTONDOWN,std::make_shared<Data::MouseButtonDownCallback>(&data));
-  data.window->setEventCallback(SDL_MOUSEBUTTONUP  ,std::make_shared<Data::MouseButtonUpCallback>(&data));
-  data.window->setEventCallback(SDL_MOUSEMOTION    ,std::make_shared<Data::MouseMotionCallback>(&data));
-  data.mainLoop->addWindow("primaryWindow",data.window);
-  data.init(&data);
-  (*data.mainLoop)();
-  data.deinit(&data);
-
+  Application app;
+  if(!app.init(argc,argv))return EXIT_FAILURE;
+  (*app.mainLoop)();
   return EXIT_SUCCESS;
 }
 
-void Data::IdleCallback::operator()(){
-  this->data->gl->glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+void Application::idle(void*d){
+  auto app = (Application*)d;
+  app->gl->glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
-  this->data->emptyVAO->bind();
-  (*this->data->prg2)();
-  this->data->emptyVAO->unbind();
+  app->emptyVAO->bind();
+  (*app->prg2)();
+  app->emptyVAO->unbind();
 
-  (*this->data->blafce)();
-  (*this->data->modelFce)();
+  (*app->blafce)();
+  (*app->modelFce)();
   TwDraw();
-  this->data->window->swap();
+  app->window->swap();
 }
 
-bool Data::WindowEventCallback::operator()(SDL_Event const&event){
-  if(event.window.event==SDL_WINDOWEVENT_CLOSE){
-    this->data->mainLoop->removeWindow("primaryWindow");
-    return true;
-  }
-  return false;
-}
-
-
-bool Data::WindowEventHandler::operator()(SDL_Event const&event){
+bool Application::eventHandler(SDL_Event const&event,void*){
   bool handledByAnt = TwEventSDL(&event,SDL_MAJOR_VERSION,SDL_MINOR_VERSION);
   if(handledByAnt)return true;
   return false;
 }
 
-bool Data::KeyDownCallback::operator()(SDL_Event const&event){
+template<bool DOWN>
+bool Application::key(SDL_Event const&event,void*d){
+  auto app = (Application*)d;
   auto name = keyboard::fullKeyName(event.key.keysym.sym);
-  auto &kernel = this->data->kernel;
+  auto &kernel = app->kernel;
   if(kernel.variableRegister->hasVariable(name))
-    kernel.variableRegister->getVariable(name)->update(true);
+    kernel.variableRegister->getVariable(name)->update(DOWN);
   return true;
 }
 
-bool Data::KeyUpCallback::operator()(SDL_Event const&event){
-  auto name = keyboard::fullKeyName(event.key.keysym.sym);
-  auto &kernel = this->data->kernel;
-  if(kernel.variableRegister->hasVariable(name))
-    kernel.variableRegister->getVariable(name)->update(false);
-  return true;
-}
-
-bool Data::MouseButtonDownCallback::operator()(SDL_Event const&event){
+template<bool DOWN>
+bool Application::mouseButton(SDL_Event const&event,void*d){
+  auto app = (Application*)d;
   auto name = mouse::fullButtonName(event.button.button);
-  auto &kernel = this->data->kernel;
+  auto &kernel = app->kernel;
   if(kernel.variableRegister->hasVariable(name))
-    kernel.variableRegister->getVariable(name)->update(true);
+    kernel.variableRegister->getVariable(name)->update(DOWN);
   return true;
 }
 
-bool Data::MouseButtonUpCallback::operator()(SDL_Event const&event){
-  auto name = mouse::fullButtonName(event.button.button);
-  auto &kernel = this->data->kernel;
-  if(kernel.variableRegister->hasVariable(name))
-    kernel.variableRegister->getVariable(name)->update(false);
-  return true;
-}
-
-bool Data::MouseMotionCallback::operator()(SDL_Event const&event){
-  auto &kernel = this->data->kernel;
+bool Application::mouseMotion(SDL_Event const&event,void*d){
+  auto app = (Application*)d;
+  auto &kernel = app->kernel;
   if(kernel.variableRegister->hasVariable("mouse.x"))
     kernel.variableRegister->getVariable("mouse.x")->update(event.motion.x);
   if(kernel.variableRegister->hasVariable("mouse.y"))
@@ -299,34 +184,48 @@ bool Data::MouseMotionCallback::operator()(SDL_Event const&event){
   if(kernel.variableRegister->hasVariable("mouse.yrel"))
     kernel.variableRegister->getVariable("mouse.yrel")->update(event.motion.yrel);
   return true;
+
 }
-
-
-
 
 std::string bla(std::string str){
   std::cout<<str<<std::endl;
   return str;
 }
 
-void Data::init(Data*data){
-  data->window->makeCurrent("rendering");
+bool Application::init(int argc,char*argv[]){
+  auto argm = std::make_shared<ge::util::ArgumentManager>(argc-1,argv+1);
+  ge::util::copyArgumentManager2VariableRegister(this->kernel.variableRegister,*argm,this->kernel.functionRegister);
+  std::cout<<this->kernel.variableRegister->toStr(0,this->kernel.typeRegister)<<std::endl;
+
+  this->mainLoop = std::make_shared<ge::ad::SDLMainLoop>(true);
+  this->mainLoop->setIdleCallback(Application::idle,this);
+  this->mainLoop->setEventHandler(Application::eventHandler,this);
+
+  this->window   = std::make_shared<ge::ad::SDLWindow>();
+  this->window->createContext("rendering",450u,ge::ad::SDLWindow::CORE,ge::ad::SDLWindow::DEBUG);
+  this->window->setEventCallback(SDL_KEYDOWN        ,Application::key<true>,this);
+  this->window->setEventCallback(SDL_KEYUP          ,Application::key<false>,this);
+  this->window->setEventCallback(SDL_MOUSEBUTTONDOWN,Application::mouseButton<true>,this);
+  this->window->setEventCallback(SDL_MOUSEBUTTONUP  ,Application::mouseButton<false>,this);
+  this->window->setEventCallback(SDL_MOUSEMOTION    ,Application::mouseMotion,this);
+  this->mainLoop->addWindow("primaryWindow",this->window);
+
+  this->window->makeCurrent("rendering");
 
   ge::gl::init(SDL_GL_GetProcAddress);
-  data->gl = ge::gl::getDefaultContext();
+  this->gl = ge::gl::getDefaultContext();
   ge::gl::setHighDebugMessage();
 
-  data->gl->glEnable(GL_DEPTH_TEST);
-  data->gl->glDepthFunc(GL_LEQUAL);
-  data->gl->glDisable(GL_CULL_FACE);
-  data->gl->glClearColor(0,1,0,1);
+  this->gl->glEnable(GL_DEPTH_TEST);
+  this->gl->glDepthFunc(GL_LEQUAL);
+  this->gl->glDisable(GL_CULL_FACE);
+  this->gl->glClearColor(0,1,0,1);
 
-  data->emptyVAO = std::make_shared<ge::gl::VertexArray>();
+  this->emptyVAO = std::make_shared<ge::gl::VertexArray>();
 
   TwInit(TW_OPENGL_CORE,nullptr);
-  TwWindowSize(data->window->getWidth(),data->window->getHeight());
+  TwWindowSize(this->window->getWidth(),this->window->getHeight());
 
-  auto &kernel = data->kernel;
   kernel.typeRegister->addType<float*>();
   kernel.addAtomicType(
       "SharedAssimpModel",
@@ -374,12 +273,7 @@ void Data::init(Data*data){
   kernel.addFunction({"computeProjection","projectionMatrix","fovy","aspect","near","far"},glm::perspective<float>);
   kernel.addFunction({"computeViewRotation","viewRotation","rotx","roty","rotz"},computeViewRotation);
   kernel.addFunction({"computeView","viewMatrix","viewRotation","position"},computeView);
-  kernel.addFunction({"cameraForward","position","viewRotation","position","speed","trigger"},cameraForward);
-  kernel.addFunction({"cameraBack","position","viewRotation","position","speed","trigger"},cameraBack);
-  kernel.addFunction({"cameraLeft","position","viewRotation","position","speed","trigger"},cameraLeft);
-  kernel.addFunction({"cameraRight","position","viewRotation","position","speed","trigger"},cameraRight);
-  kernel.addFunction({"cameraUp","position","viewRotation","position","speed","trigger"},cameraUp);
-  kernel.addFunction({"cameraDown","position","viewRotation","position","speed","trigger"},cameraDown);
+  kernel.addFunction({"cameraMove","position","viewRotation","position","speed","direction","trigger"},cameraMove,cameraMoveTrigger);
   kernel.addFunction({"cameraAddXRotation","angle","angle","sensitivity","rel","trigger"},cameraAddXRotation);
   kernel.addFunction({"cameraAddYRotation","angle","angle","sensitivity","rel","trigger"},cameraAddYRotation);
   kernel.addFunction({"clearMouseRel","zero"},clearMouseRel);
@@ -408,59 +302,59 @@ void Data::init(Data*data){
 
 
 
-  data->prg2 = std::make_shared<ge::de::Body>();
-  data->prg2->toBody()->addStatement(kernel.createFce("createVSFSProgram","program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"));
+  this->prg2 = std::make_shared<ge::de::Body>();
+  this->prg2->toBody()->addStatement(kernel.createFce("createVSFSProgram","program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"));
 
-  auto usep = kernel.createFce("Program::use",kernel.createFce("sharedProgram2Program*",data->prg2->toBody()->at(0)->toFunction()->getOutputData()));
+  auto usep = kernel.createFce("Program::use",kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(0)->toFunction()->getOutputData()));
   usep->setIgnoreDirty(true);
   usep->setIgnoreInputChanges(true);
-  data->prg2->toBody()->addStatement(usep);
+  this->prg2->toBody()->addStatement(usep);
 
-  data->prg2->toBody()->addStatement(kernel.createFce("Program::set3fv",
-        kernel.createFce("sharedProgram2Program*",data->prg2->toBody()->at(0)->toFunction()->getOutputData()),
+  this->prg2->toBody()->addStatement(kernel.createFce("Program::set3fv",
+        kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(0)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("position"),
         kernel.createFce("f32[3]2f32*","camera.position"),
         kernel.createVariable<GLsizei>(1)
         ));
-  data->prg2->toBody()->addStatement(kernel.createFce("cameraAddXRotation",
+  this->prg2->toBody()->addStatement(kernel.createFce("cameraAddXRotation",
         "camera.rotX","camera.sensitivity","mouse.yrel","mouse.left","camera.rotX"));
-  data->prg2->toBody()->addStatement(kernel.createFce("cameraAddYRotation",
+  this->prg2->toBody()->addStatement(kernel.createFce("cameraAddYRotation",
         "camera.rotY","camera.sensitivity","mouse.xrel","mouse.left","camera.rotY"));
   auto clearxrel = kernel.createFce("clearMouseRel","mouse.xrel");
   clearxrel->setIgnoreDirty(true);
   clearxrel->setIgnoreInputChanges(true);
-  data->prg2->toBody()->addStatement(clearxrel);
+  this->prg2->toBody()->addStatement(clearxrel);
   auto clearyrel = kernel.createFce("clearMouseRel","mouse.yrel");
   clearyrel->setIgnoreDirty(true);
   clearyrel->setIgnoreInputChanges(true);
-  data->prg2->toBody()->addStatement(clearyrel);
+  this->prg2->toBody()->addStatement(clearyrel);
 
-  data->prg2->toBody()->addStatement(kernel.createFce("cameraForward",
-        "camera.viewRotation","camera.position","camera.speed","keyboard.W","camera.position"));
-  data->prg2->toBody()->addStatement(kernel.createFce("cameraBack",
-        "camera.viewRotation","camera.position","camera.speed","keyboard.S","camera.position"));
-  data->prg2->toBody()->addStatement(kernel.createFce("cameraLeft",
-        "camera.viewRotation","camera.position","camera.speed","keyboard.A","camera.position"));
-  data->prg2->toBody()->addStatement(kernel.createFce("cameraRight",
-        "camera.viewRotation","camera.position","camera.speed","keyboard.D","camera.position"));
-  data->prg2->toBody()->addStatement(kernel.createFce("cameraUp",
-        "camera.viewRotation","camera.position","camera.speed","keyboard.Space","camera.position"));
-  data->prg2->toBody()->addStatement(kernel.createFce("cameraDown",
-        "camera.viewRotation","camera.position","camera.speed","keyboard.Left Shift","camera.position"));
+  this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
+        "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(-3),"keyboard.W","camera.position"));
+  this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
+        "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(+3),"keyboard.S","camera.position"));
+  this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
+        "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(-1),"keyboard.A","camera.position"));
+  this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
+        "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(+1),"keyboard.D","camera.position"));
+  this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
+        "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(+2),"keyboard.Space","camera.position"));
+  this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
+        "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(-2),"keyboard.Left Shift","camera.position"));
 
-  data->prg2->toBody()->addStatement(kernel.createFce("computeViewRotation",
+  this->prg2->toBody()->addStatement(kernel.createFce("computeViewRotation",
         "camera.rotX","camera.rotY","camera.rotZ","camera.viewRotation"));
-  data->prg2->toBody()->addStatement(kernel.createFce("computeView",
+  this->prg2->toBody()->addStatement(kernel.createFce("computeView",
         "camera.viewRotation","camera.position","camera.view"));
-  data->prg2->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
-        kernel.createFce("sharedProgram2Program*",data->prg2->toBody()->at(0)->toFunction()->getOutputData()),
+  this->prg2->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
+        kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(0)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("projection"),
         kernel.createFce("f32[16]2f32*","camera.projection"),
         kernel.createVariable<GLsizei>(1),
         kernel.createVariable<GLboolean>(GL_FALSE)
         ));
-  data->prg2->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
-        kernel.createFce("sharedProgram2Program*",data->prg2->toBody()->at(0)->toFunction()->getOutputData()),
+  this->prg2->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
+        kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(0)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("view"),
         kernel.createFce("f32[16]2f32*","camera.view"),
         kernel.createVariable<GLsizei>(1),
@@ -473,22 +367,22 @@ void Data::init(Data*data){
   auto drawArrays = kernel.createFce("glDrawArrays","gl",kernel.createVariable<GLenum>(GL_TRIANGLE_STRIP),kernel.createVariable<GLint>(0),kernel.createVariable<GLsizei>(3));
   drawArrays->setIgnoreDirty(true);
   drawArrays->setIgnoreInputChanges(true);
-  data->prg2->toBody()->addStatement(drawArrays);
+  this->prg2->toBody()->addStatement(drawArrays);
 
 
-  //data->prg2->toBody()->addStatement(kernel.createFce("addOneToXIf","camera.position","keyboard.A","camera.position"));
-  data->prg2->toBody()->addStatement(kernel.createFce("computeProjection","camera.fovy","camera.aspect","camera.near","camera.far","camera.projection"));
-  data->prg2->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
-  data->prg2->setIgnoreDirty(true);
+  //this->prg2->toBody()->addStatement(kernel.createFce("addOneToXIf","camera.position","keyboard.A","camera.position"));
+  this->prg2->toBody()->addStatement(kernel.createFce("computeProjection","camera.fovy","camera.aspect","camera.near","camera.far","camera.projection"));
+  this->prg2->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
+  this->prg2->setIgnoreDirty(true);
 
-  data->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister);
+  this->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister);
 
-  data->blafce = kernel.createFce("bla","testString");
-  data->modelFce = kernel.createFce("assimpLoader","modelFile");
+  this->blafce = kernel.createFce("bla","testString");
+  this->modelFce = kernel.createFce("assimpLoader","modelFile");
+  return true;
 }
 
-void Data::deinit(Data*data){
-  (void)data;
-  data->variableManipulator = nullptr;
+Application::~Application(){
+  this->variableManipulator = nullptr;
   TwTerminate();
 }
