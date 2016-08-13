@@ -10,11 +10,14 @@
 class CallbackData;
 class VariableRegisterManipulator{
   public:
-      VariableRegisterManipulator(std::shared_ptr<ge::de::VariableRegister> const&vr);
+      VariableRegisterManipulator(
+          std::shared_ptr<ge::de::VariableRegister>const&vr,
+          std::shared_ptr<ge::de::NameRegister>const&nr);
       virtual ~VariableRegisterManipulator();
   protected:
     TwBar* _bar = nullptr;
     std::shared_ptr<ge::de::VariableRegister> _vr = nullptr;
+    std::shared_ptr<ge::de::NameRegister>     _nr = nullptr;
     std::vector<CallbackData*>_callbackData;
     bool _addRegister(
         std::shared_ptr<ge::de::VariableRegister>const&vr,

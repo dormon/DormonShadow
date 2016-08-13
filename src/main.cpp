@@ -36,7 +36,6 @@ struct Application{
   std::shared_ptr<ge::gl::VertexArray>        emptyVAO            = nullptr;
   std::shared_ptr<VariableRegisterManipulator>variableManipulator = nullptr;
   std::shared_ptr<ge::de::Statement>          prg2                = nullptr;
-  std::shared_ptr<ge::de::Function>           blafce              = nullptr;
   std::shared_ptr<ge::de::Function>           modelFce            = nullptr;
   ~Application();
   bool init(int argc,char*argv[]);
@@ -79,15 +78,6 @@ std::shared_ptr<AssimpModel>assimpLoader(std::string name){
   auto model = aiImportFile(name.c_str(),aiProcess_Triangulate|aiProcess_GenNormals|aiProcess_SortByPType);
   assert(model!=nullptr);
   return std::make_shared<AssimpModel>(model);
-}
-
-glm::vec3 addOneToXIf(glm::vec3 const&a,bool trigger){
-  if(!trigger)return a;
-  return glm::vec3(1.f,0.f,0.f)+a;
-}
-
-bool addOneToXIfSignaling(glm::vec3 const&,bool trigger){
-  return trigger;
 }
 
 glm::mat4 computeViewRotation(float rx,float ry,float rz){
@@ -133,15 +123,9 @@ void Application::idle(void*d){
   (*app->prg2)();
   app->emptyVAO->unbind();
 
-  (*app->blafce)();
   (*app->modelFce)();
   TwDraw();
   app->window->swap();
-}
-
-std::string bla(std::string str){
-  std::cout<<str<<std::endl;
-  return str;
 }
 
 bool Application::init(int argc,char*argv[]){
@@ -171,7 +155,7 @@ bool Application::init(int argc,char*argv[]){
   this->gl->glEnable(GL_DEPTH_TEST);
   this->gl->glDepthFunc(GL_LEQUAL);
   this->gl->glDisable(GL_CULL_FACE);
-  this->gl->glClearColor(0,1,0,1);
+  this->gl->glClearColor(0,.5,0,1);
 
   this->emptyVAO = std::make_shared<ge::gl::VertexArray>();
 
@@ -188,13 +172,24 @@ bool Application::init(int argc,char*argv[]){
   kernel.addAtomicClass<ge::gl::Context>("GL");
 
   kernel.addFunction({"assimpLoader","fileName"},assimpLoader);
-  kernel.addFunction({"bla","output","input"},bla);
-  kernel.addFunction({"addOneToXIf","output","input"},addOneToXIf,addOneToXIfSignaling);
   //script part
   kernel.addArrayType("vec3",3,"f32");
   kernel.addArrayType("mat4",16,"f32");
   kernel.addArrayType(ge::de::keyword<float[16]>(),16,"f32");
   registerPlugin(&kernel);
+  kernel.addEnumType("ShaderType",{
+      GL_VERTEX_SHADER,
+      GL_TESS_CONTROL_SHADER,
+      GL_TESS_EVALUATION_SHADER,
+      GL_GEOMETRY_SHADER,
+      GL_FRAGMENT_SHADER,
+      GL_COMPUTE_SHADER},{
+      "vertex",
+      "control",
+      "evaluation",
+      "geometry",
+      "fragment",
+      "compute"});
 
   kernel.addVariable("program.version"       ,std::string("#version 450\n"));
   kernel.addVariable("program.vertexShader"  ,std::string("vertex.vp")     );
@@ -214,10 +209,10 @@ bool Application::init(int argc,char*argv[]){
   kernel.addVariable("camera.speed"          ,0.01f);
   kernel.addVariable("camera.sensitivity"    ,0.01f);
   kernel.addVariable("shaderDirectory"       ,std::string("shaders/"));
-  kernel.addVariable("testString"            ,std::string("ahoj"));
   kernel.addVariable("modelFile"             ,std::string("/media/windata/ft/prace/models/cube/cube.obj"));
   kernel.addVariable("gl"                    ,ge::gl::Context{});
   kernel.addVariable("frameCounter"          ,(uint32_t)0);
+  kernel.addEmptyVariable("stype","ShaderType");
   keyboard::registerKeyboard(&kernel);
   mouse::registerMouse(&kernel);
 
@@ -254,14 +249,10 @@ bool Application::init(int argc,char*argv[]){
 
 
 
-  this->prg2 = std::make_shared<ge::de::Body>();
+  this->prg2 = std::make_shared<ge::de::Body>(true);
   this->prg2->toBody()->addStatement(kernel.createFce("createVSFSProgram","program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"));
-
-  auto usep = kernel.createFce("Program::use",kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(0)->toFunction()->getOutputData()));
-  usep->setIgnoreDirty(true);
-  usep->setIgnoreInputChanges(true);
-  this->prg2->toBody()->addStatement(usep);
-
+  this->prg2->toBody()->addStatement(
+      kernel.createAlwaysExecFce("Program::use",kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(0)->toFunction()->getOutputData())));
   this->prg2->toBody()->addStatement(kernel.createFce("Program::set3fv",
         kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(0)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("position"),
@@ -272,15 +263,10 @@ bool Application::init(int argc,char*argv[]){
         "camera.rotX","camera.sensitivity","mouse.yrel","mouse.left","camera.rotX"));
   this->prg2->toBody()->addStatement(kernel.createFce("cameraAddYRotation",
         "camera.rotY","camera.sensitivity","mouse.xrel","mouse.left","camera.rotY"));
-  auto clearxrel = kernel.createFce("clearMouseRel","mouse.xrel");
-  clearxrel->setIgnoreDirty(true);
-  clearxrel->setIgnoreInputChanges(true);
-  this->prg2->toBody()->addStatement(clearxrel);
-  auto clearyrel = kernel.createFce("clearMouseRel","mouse.yrel");
-  clearyrel->setIgnoreDirty(true);
-  clearyrel->setIgnoreInputChanges(true);
-  this->prg2->toBody()->addStatement(clearyrel);
-
+  this->prg2->toBody()->addStatement(
+      kernel.createAlwaysExecFce("clearMouseRel","mouse.xrel"));
+  this->prg2->toBody()->addStatement(
+      kernel.createAlwaysExecFce("clearMouseRel","mouse.yrel"));
   this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(-3),"keyboard.W","camera.position"));
   this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
@@ -293,7 +279,6 @@ bool Application::init(int argc,char*argv[]){
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(+2),"keyboard.Space","camera.position"));
   this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(-2),"keyboard.Left Shift","camera.position"));
-
   this->prg2->toBody()->addStatement(kernel.createFce("computeViewRotation",
         "camera.rotX","camera.rotY","camera.rotZ","camera.viewRotation"));
   this->prg2->toBody()->addStatement(kernel.createFce("computeView",
@@ -312,24 +297,13 @@ bool Application::init(int argc,char*argv[]){
         kernel.createVariable<GLsizei>(1),
         kernel.createVariable<GLboolean>(GL_FALSE)
         ));
-
-
-
-
-  auto drawArrays = kernel.createFce("glDrawArrays","gl",kernel.createVariable<GLenum>(GL_TRIANGLE_STRIP),kernel.createVariable<GLint>(0),kernel.createVariable<GLsizei>(3));
-  drawArrays->setIgnoreDirty(true);
-  drawArrays->setIgnoreInputChanges(true);
-  this->prg2->toBody()->addStatement(drawArrays);
-
-
-  //this->prg2->toBody()->addStatement(kernel.createFce("addOneToXIf","camera.position","keyboard.A","camera.position"));
+  this->prg2->toBody()->addStatement(
+      kernel.createAlwaysExecFce("glDrawArrays","gl",kernel.createVariable<GLenum>(GL_TRIANGLE_STRIP),kernel.createVariable<GLint>(0),kernel.createVariable<GLsizei>(3)));
   this->prg2->toBody()->addStatement(kernel.createFce("computeProjection","camera.fovy","camera.aspect","camera.near","camera.far","camera.projection"));
   this->prg2->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
-  this->prg2->setIgnoreDirty(true);
 
-  this->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister);
+  this->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister,kernel.nameRegister);
 
-  this->blafce = kernel.createFce("bla","testString");
   this->modelFce = kernel.createFce("assimpLoader","modelFile");
   return true;
 }

@@ -186,6 +186,16 @@ bool VariableRegisterManipulator::_addVariable(
       path.pop_back();
     }
   }
+  if(tr->getTypeIdType(typeId) == TypeRegister::ENUM){
+    this->_callbackData.push_back(new CallbackData(varName,vr));
+    std::vector<TwEnumVal>defs;
+    size_t n=tr->getNofEnumElements(typeId);
+    for(size_t i=0;i<n;++i)
+      defs.push_back(TwEnumVal{(int)tr->getEnumElement(typeId,i),this->_nr->getEnumElementName(typeId,i).c_str()});
+    TwType ttype = TwDefineEnum(tr->getTypeIdName(typeId).c_str(),defs.data(),defs.size());
+    TwAddVarCB(this->_bar,varFullName.c_str(),ttype,_get<ge::de::EnumElementType>,_set<ge::de::EnumElementType>,(void*)this->_callbackData.back(),stringer(groupCommand(group),labelCommand(varLabelName),"").c_str());
+    hasVariable = true;
+  }
   return hasVariable;
 }
 
@@ -210,9 +220,12 @@ bool VariableRegisterManipulator::_addRegister(std::shared_ptr<VariableRegister>
 }
 
 VariableRegisterManipulator::VariableRegisterManipulator(
-    std::shared_ptr<ge::de::VariableRegister> const&vr){
+    std::shared_ptr<ge::de::VariableRegister> const&vr,
+    std::shared_ptr<ge::de::NameRegister> const&nr
+    ){
   this->_bar = TwNewBar(vr->getName().c_str());
   this->_vr = vr;
+  this->_nr = nr;
   this->_addRegister(vr,"",vr->getFullName());
 }
 
