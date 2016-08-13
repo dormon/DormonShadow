@@ -9,6 +9,7 @@
 #include<geUtil/ArgumentManager/ArgumentManager.h>
 #include<geAd/SDLWindow/SDLWindow.h>
 #include<geCore/Text.h>
+#include<geUtil/Timer.h>
 
 #include<AntTweakBar.h>
 
@@ -36,7 +37,6 @@ struct Application{
   std::shared_ptr<ge::gl::VertexArray>        emptyVAO            = nullptr;
   std::shared_ptr<VariableRegisterManipulator>variableManipulator = nullptr;
   std::shared_ptr<ge::de::Statement>          prg2                = nullptr;
-  std::shared_ptr<ge::de::Function>           modelFce            = nullptr;
   ~Application();
   bool init(int argc,char*argv[]);
   static void idle(void*);
@@ -63,21 +63,63 @@ class AssimpModel{
     }
 };
 
+std::shared_ptr<ge::gl::Buffer>assimpModelToVBO(std::shared_ptr<AssimpModel>const&mdl){
+  auto model = mdl->model;
+  size_t vertices=0;
+  std::vector<float>vertData;
+  for(size_t m=0;m<model->mNumMeshes;++m)
+    vertices+=model->mMeshes[m]->mNumVertices;
+  vertData.resize(vertices*3);
+  for(size_t i=0;i<model->mNumMeshes;++i){
+    auto mesh = model->mMeshes[i];
+    for(size_t j=0;j<mesh->mNumVertices;++j){
+      vertData.push_back(mesh->mVertices[j].x);
+      vertData.push_back(mesh->mVertices[j].y);
+      vertData.push_back(mesh->mVertices[j].z);
+    }
+  }
+  auto result = std::make_shared<ge::gl::Buffer>(vertices*sizeof(float)*3,vertData.data());
+  return result;
+}
+
+uint32_t nofVertices(std::shared_ptr<AssimpModel>const&mdl){
+  auto model = mdl->model;
+  size_t vertices=0;
+  std::vector<float>vertData;
+  for(size_t m=0;m<model->mNumMeshes;++m)
+    vertices+=model->mMeshes[m]->mNumVertices;
+  return vertices;
+} 
+
 namespace ge{
   namespace de{
     GE_DE_ADD_KEYWORD(std::shared_ptr<AssimpModel>,"SharedAssimpModel")
+    GE_DE_ADD_KEYWORD(std::shared_ptr<ge::gl::Buffer>,"SharedBuffer")
     GE_DE_ADD_KEYWORD(glm::vec3,ge::de::keyword<float[3]>())
     GE_DE_ADD_KEYWORD(glm::vec4,ge::de::keyword<float[4]>())
     GE_DE_ADD_KEYWORD(glm::mat3,ge::de::keyword<float[3][3]>())
     GE_DE_ADD_KEYWORD(glm::mat4,ge::de::keyword<float[4][4]>())
     GE_DE_ADD_KEYWORD(ge::gl::Context,"GL")
+    GE_DE_ADD_KEYWORD(ge::util::Timer<float>,"Timer")
   }
 }
 
-std::shared_ptr<AssimpModel>assimpLoader(std::string name){
+std::shared_ptr<AssimpModel>assimpLoader(std::string const&name){
   auto model = aiImportFile(name.c_str(),aiProcess_Triangulate|aiProcess_GenNormals|aiProcess_SortByPType);
-  assert(model!=nullptr);
+  if(model==nullptr){
+    ge::core::printError(GE_CORE_FCENAME,"Can't open file",name);
+    return nullptr;
+  }
   return std::make_shared<AssimpModel>(model);
+}
+
+std::shared_ptr<AssimpModel>assimpLoaderFailsafe(std::shared_ptr<AssimpModel>const&last,std::shared_ptr<AssimpModel>const&n){
+  if(n==nullptr)return last;
+  return n;
+}
+
+bool assimpLoaderFailsafeTrigger(std::shared_ptr<AssimpModel>const&,std::shared_ptr<AssimpModel>const&n){
+  return n!=nullptr;
 }
 
 glm::mat4 computeViewRotation(float rx,float ry,float rz){
@@ -114,7 +156,6 @@ int32_t clearMouseRel(){return 0;}
 
 uint32_t incrementFrameCounter(uint32_t counter){return counter+1;}
 
-
 void Application::idle(void*d){
   auto app = (Application*)d;
   app->gl->glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
@@ -123,9 +164,11 @@ void Application::idle(void*d){
   (*app->prg2)();
   app->emptyVAO->unbind();
 
-  (*app->modelFce)();
   TwDraw();
   app->window->swap();
+  //app->kernel.variableRegister->getVariable("time")->update(app->timer.elapsedFromStart());
+  //app->kernel.variableRegister->getVariable("frameTime")->update(app->timer.elapsedFromLast());
+  //app->kernel.variableRegister->getVariable("fps")->update((uint32_t)*app->kernel.variable("frameCounter")/(float)*app->kernel.variable("time"));
 }
 
 bool Application::init(int argc,char*argv[]){
@@ -168,10 +211,15 @@ bool Application::init(int argc,char*argv[]){
       sizeof(std::shared_ptr<AssimpModel>),
       nullptr,
       [](void*ptr){((std::shared_ptr<AssimpModel>*)ptr)->~shared_ptr();});
+  kernel.addAtomicClass<std::shared_ptr<ge::gl::Buffer>>("SharedBuffer");
+  kernel.addAtomicClass<ge::util::Timer<float>>("Timer");
 
   kernel.addAtomicClass<ge::gl::Context>("GL");
 
   kernel.addFunction({"assimpLoader","fileName"},assimpLoader);
+  kernel.addFunction({"assimpLoaderFailsafe","last","new"},assimpLoaderFailsafe,assimpLoaderFailsafeTrigger);
+  kernel.addFunction({"assimpModelToVBO","assimpModel","vbo"},assimpModelToVBO);
+  kernel.addFunction({"nofVertices","assimpModel","number"},nofVertices);
   //script part
   kernel.addArrayType("vec3",3,"f32");
   kernel.addArrayType("mat4",16,"f32");
@@ -209,13 +257,21 @@ bool Application::init(int argc,char*argv[]){
   kernel.addVariable("camera.speed"          ,0.01f);
   kernel.addVariable("camera.sensitivity"    ,0.01f);
   kernel.addVariable("shaderDirectory"       ,std::string("shaders/"));
-  kernel.addVariable("modelFile"             ,std::string("/media/windata/ft/prace/models/cube/cube.obj"));
+  kernel.addVariable("modelFileName"         ,std::string("/media/windata/ft/prace/models/cube/cube.obj"));
+  kernel.addEmptyVariable("model","SharedAssimpModel");
+  kernel.addVariable("nofModelVertices"      ,(uint32_t)0);
   kernel.addVariable("gl"                    ,ge::gl::Context{});
   kernel.addVariable("frameCounter"          ,(uint32_t)0);
+  kernel.addEmptyVariable("timer","Timer");
+  kernel.addVariable("time"                  ,0.0f);
+  kernel.addVariable("frameTime"             ,0.0f);
+  kernel.addVariable("fps"                   ,0.0f);
   kernel.addEmptyVariable("stype","ShaderType");
   keyboard::registerKeyboard(&kernel);
   mouse::registerMouse(&kernel);
 
+  kernel.addFunction({"Timer::elapsedFromLast" ,"time"},&ge::util::Timer<float>::elapsedFromLast );
+  kernel.addFunction({"Timer::elapsedFromStart","time"},&ge::util::Timer<float>::elapsedFromStart);
   kernel.addFunction({"glDrawArrays","mode","first","count"},&ge::gl::Context::glDrawArrays);
   kernel.addFunction({"computeProjection","projectionMatrix","fovy","aspect","near","far"},glm::perspective<float>);
   kernel.addFunction({"computeViewRotation","viewRotation","rotx","roty","rotz"},computeViewRotation);
@@ -250,11 +306,15 @@ bool Application::init(int argc,char*argv[]){
 
 
   this->prg2 = std::make_shared<ge::de::Body>(true);
-  this->prg2->toBody()->addStatement(kernel.createFce("createVSFSProgram","program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"));
+
   this->prg2->toBody()->addStatement(
-      kernel.createAlwaysExecFce("Program::use",kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(0)->toFunction()->getOutputData())));
+      kernel.createFce("assimpLoaderFailsafe","model",kernel.createFce("assimpLoader","modelFileName"),"model"));
+  this->prg2->toBody()->addStatement(kernel.createFce("nofVertices","model","nofModelVertices"));
+  auto programStatementIndex = this->prg2->toBody()->addStatement(kernel.createFce("createVSFSProgram","program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"));
+  this->prg2->toBody()->addStatement(
+      kernel.createAlwaysExecFce("Program::use",kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(programStatementIndex)->toFunction()->getOutputData())));
   this->prg2->toBody()->addStatement(kernel.createFce("Program::set3fv",
-        kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(0)->toFunction()->getOutputData()),
+        kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("position"),
         kernel.createFce("f32[3]2f32*","camera.position"),
         kernel.createVariable<GLsizei>(1)
@@ -284,14 +344,14 @@ bool Application::init(int argc,char*argv[]){
   this->prg2->toBody()->addStatement(kernel.createFce("computeView",
         "camera.viewRotation","camera.position","camera.view"));
   this->prg2->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
-        kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(0)->toFunction()->getOutputData()),
+        kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("projection"),
         kernel.createFce("f32[16]2f32*","camera.projection"),
         kernel.createVariable<GLsizei>(1),
         kernel.createVariable<GLboolean>(GL_FALSE)
         ));
   this->prg2->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
-        kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(0)->toFunction()->getOutputData()),
+        kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("view"),
         kernel.createFce("f32[16]2f32*","camera.view"),
         kernel.createVariable<GLsizei>(1),
@@ -301,10 +361,11 @@ bool Application::init(int argc,char*argv[]){
       kernel.createAlwaysExecFce("glDrawArrays","gl",kernel.createVariable<GLenum>(GL_TRIANGLE_STRIP),kernel.createVariable<GLint>(0),kernel.createVariable<GLsizei>(3)));
   this->prg2->toBody()->addStatement(kernel.createFce("computeProjection","camera.fovy","camera.aspect","camera.near","camera.far","camera.projection"));
   this->prg2->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
+  this->prg2->toBody()->addStatement(kernel.createAlwaysExecFce("Timer::elapsedFromStart","timer","time"));
 
   this->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister,kernel.nameRegister);
 
-  this->modelFce = kernel.createFce("assimpLoader","modelFile");
+  //this->timer.reset();
   return true;
 }
 
