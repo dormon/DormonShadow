@@ -7,14 +7,6 @@
 
 using namespace ge::de;
 
-namespace ge{
-  namespace de{
-    GE_DE_ADD_KEYWORD(ge::gl::Program,"Program")
-    GE_DE_ADD_KEYWORD(std::shared_ptr<ge::gl::Shader>,"SharedShader")
-    GE_DE_ADD_KEYWORD(std::shared_ptr<ge::gl::Program>,"SharedProgram")
-  }
-}
-
 std::string shaderSourceLoader(
     std::string const&version,
     std::string const&defines,
@@ -60,35 +52,62 @@ int32_t neco(){
 
 void registerPlugin(Kernel*kernel){
   (void)kernel;
-  kernel->addAtomicClass<std::shared_ptr<ge::gl::Shader>>("SharedShader");
-  kernel->addAtomicClass<std::shared_ptr<ge::gl::Program>>("SharedProgram");
-  kernel->addAtomicClass<ge::gl::Program>("Program");
-  kernel->typeRegister->addType<ge::gl::Program*>();
+  kernel->addAtomicClass<ge::gl::Program          >();
+  kernel->addAtomicClass<ge::gl::Shader           >();
+  kernel->addAtomicClass<ge::gl::VertexArray      >();
+  //kernel->addAtomicClass<ge::gl::Texture          >();
+  kernel->addAtomicClass<ge::gl::Framebuffer      >();
+  //kernel->addAtomicClass<ge::gl::Renderbuffer     >();
+  kernel->addAtomicClass<ge::gl::Buffer           >();
+  kernel->addAtomicClass<ge::gl::Sampler          >();
+  kernel->addAtomicClass<ge::gl::ProgramPipeline  >();
+  //kernel->addAtomicClass<ge::gl::AsynchronousQuery>();
+  kernel->typeRegister->addType<ge::gl::Program          *>();
+  kernel->typeRegister->addType<ge::gl::Shader           *>();
+  kernel->typeRegister->addType<ge::gl::VertexArray      *>();
+  //kernel->typeRegister->addType<ge::gl::Texture          *>();
+  kernel->typeRegister->addType<ge::gl::Framebuffer      *>();
+  //kernel->typeRegister->addType<ge::gl::Renderbuffer     *>();
+  kernel->typeRegister->addType<ge::gl::Buffer           *>();
+  kernel->typeRegister->addType<ge::gl::Sampler          *>();
+  kernel->typeRegister->addType<ge::gl::ProgramPipeline  *>();
+  //kernel->typeRegister->addType<ge::gl::AsynchronousQuery*>();
+  kernel->addAtomicClass<std::shared_ptr<ge::gl::Program          >>();
+  kernel->addAtomicClass<std::shared_ptr<ge::gl::Shader           >>();
+  kernel->addAtomicClass<std::shared_ptr<ge::gl::VertexArray      >>();
+  //kernel->addAtomicClass<std::shared_ptr<ge::gl::Texture          >>();
+  kernel->addAtomicClass<std::shared_ptr<ge::gl::Framebuffer      >>();
+  //kernel->addAtomicClass<std::shared_ptr<ge::gl::Renderbuffer     >>();
+  kernel->addAtomicClass<std::shared_ptr<ge::gl::Buffer           >>();
+  kernel->addAtomicClass<std::shared_ptr<ge::gl::Sampler          >>();
+  kernel->addAtomicClass<std::shared_ptr<ge::gl::ProgramPipeline  >>();
+  //kernel->addAtomicClass<std::shared_ptr<ge::gl::AsynchronousQuery>>();
 
+  kernel->addFunction("sharedProgram2Program*"        ,{"sharedProgram"    ,"program*"    },sharedPointerToPointer<ge::gl::Program    >);
+  kernel->addFunction("sharedVertexArray2VertexArray*",{"sharedVertexArray","vertexArray*"},sharedPointerToPointer<ge::gl::VertexArray>);
 
-  kernel->addFunction({"shaderSourceLoader","source","version","defines","dir","fileNames"},shaderSourceLoader);
-  kernel->addFunction({"createVertexShader"    ,"sharedShader","source"},createShader<GL_VERTEX_SHADER>);
-  kernel->addFunction({"createFragmentShader"  ,"sharedShader","source"},createShader<GL_FRAGMENT_SHADER>);
-  kernel->addFunction({"createGeometryShader"  ,"sharedShader","source"},createShader<GL_GEOMETRY_SHADER>);
-  kernel->addFunction({"createControlShader"   ,"sharedShader","source"},createShader<GL_TESS_CONTROL_SHADER>);
-  kernel->addFunction({"createEvaluationShader","sharedShader","source"},createShader<GL_TESS_EVALUATION_SHADER>);
-  kernel->addFunction({"createComputeShader"   ,"sharedShader","source"},createShader<GL_COMPUTE_SHADER>);
-  
-
+  kernel->addFunction("shaderSourceLoader"    ,{"version","defines","dir","fileNames","source"},shaderSourceLoader);
+  kernel->addFunction("createVertexShader"    ,{"source","sharedShader"},createShader<GL_VERTEX_SHADER>);
+  kernel->addFunction("createFragmentShader"  ,{"source","sharedShader"},createShader<GL_FRAGMENT_SHADER>);
+  kernel->addFunction("createGeometryShader"  ,{"source","sharedShader"},createShader<GL_GEOMETRY_SHADER>);
+  kernel->addFunction("createControlShader"   ,{"source","sharedShader"},createShader<GL_TESS_CONTROL_SHADER>);
+  kernel->addFunction("createEvaluationShader",{"source","sharedShader"},createShader<GL_TESS_EVALUATION_SHADER>);
+  kernel->addFunction("createComputeShader"   ,{"source","sharedShader"},createShader<GL_COMPUTE_SHADER>);
 
   using SS = std::shared_ptr<ge::gl::Shader>const&;
-  kernel->addFunction({"createProgram1","shaderProgram","shader0"},createProgram<SS>);
-  kernel->addFunction({"createProgram2","shaderProgram","shader0","shader1"},createProgram<SS,SS>);
-  kernel->addFunction({"createProgram3","shaderProgram","shader0","shader1","shader2"},createProgram<SS,SS,SS>);
-  kernel->addFunction({"createProgram4","shaderProgram","shader0","shader1","shader2","shader3"},createProgram<SS,SS,SS,SS>);
-  kernel->addFunction({"createProgram5","shaderProgram","shader0","shader1","shader2","shader3","shader4"},createProgram<SS,SS,SS,SS,SS>);
+  kernel->addFunction("createProgram1",{"shader0"                                        ,"sharedProgram"},createProgram<SS>);
+  kernel->addFunction("createProgram2",{"shader0","shader1"                              ,"sharedProgram"},createProgram<SS,SS>);
+  kernel->addFunction("createProgram3",{"shader0","shader1","shader2"                    ,"sharedProgram"},createProgram<SS,SS,SS>);
+  kernel->addFunction("createProgram4",{"shader0","shader1","shader2","shader3"          ,"sharedProgram"},createProgram<SS,SS,SS,SS>);
+  kernel->addFunction("createProgram5",{"shader0","shader1","shader2","shader3","shader4","sharedProgram"},createProgram<SS,SS,SS,SS,SS>);
 
 
-  kernel->addFunction({"sharedProgram2Program*","program*","sharedProgram"},sharedPointerToPointer<ge::gl::Program>);
-  kernel->addFunction({"f32[3]2f32*","f32[3]","f32*"},arrayToPointer<float,3>);
-  kernel->addFunction({"f32[16]2f32*","f32[16]","f32*"},arrayToPointer<float,16>);
-  kernel->addFunction({"Program::use"},&ge::gl::Program::use);
-  kernel->addFunction({"Program::set3fv"},&ge::gl::Program::set3fv);
-  kernel->addFunction({"Program::setMatrix4fv"},&ge::gl::Program::setMatrix4fv);
+  kernel->addFunction("f32[3]2f32*"           ,{"f32[3]","f32*"},arrayToPointer<float,3>);
+  kernel->addFunction("f32[16]2f32*"          ,{"f32[16]","f32*"},arrayToPointer<float,16>);
+  kernel->addFunction("Program::use"         ,{"program"                                   },&ge::gl::Program::use);
+  kernel->addFunction("Program::set3fv"      ,{"program","name","value","count"            },&ge::gl::Program::set3fv);
+  kernel->addFunction("Program::setMatrix4fv",{"program","name","value","count","transpose"},&ge::gl::Program::setMatrix4fv);
+  kernel->addFunction("VertexArray::bind"  ,{"vertexArray"},&ge::gl::VertexArray::bind  );
+  kernel->addFunction("VertexArray::unbind",{"vertexArray"},&ge::gl::VertexArray::unbind);
   
 }

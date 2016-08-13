@@ -36,7 +36,7 @@ struct Application{
   std::shared_ptr<ge::ad::SDLWindow>          window              = nullptr;
   std::shared_ptr<ge::gl::VertexArray>        emptyVAO            = nullptr;
   std::shared_ptr<VariableRegisterManipulator>variableManipulator = nullptr;
-  std::shared_ptr<ge::de::Statement>          prg2                = nullptr;
+  std::shared_ptr<ge::de::Statement>          idleScript          = nullptr;
   ~Application();
   bool init(int argc,char*argv[]);
   static void idle(void*);
@@ -94,7 +94,6 @@ uint32_t nofVertices(std::shared_ptr<AssimpModel>const&mdl){
 namespace ge{
   namespace de{
     GE_DE_ADD_KEYWORD(std::shared_ptr<AssimpModel>,"SharedAssimpModel")
-    GE_DE_ADD_KEYWORD(std::shared_ptr<ge::gl::Buffer>,"SharedBuffer")
     GE_DE_ADD_KEYWORD(glm::vec3,ge::de::keyword<float[3]>())
     GE_DE_ADD_KEYWORD(glm::vec4,ge::de::keyword<float[4]>())
     GE_DE_ADD_KEYWORD(glm::mat3,ge::de::keyword<float[3][3]>())
@@ -156,21 +155,6 @@ int32_t clearMouseRel(){return 0;}
 
 uint32_t incrementFrameCounter(uint32_t counter){return counter+1;}
 
-void Application::idle(void*d){
-  auto app = (Application*)d;
-  app->gl->glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-
-  app->emptyVAO->bind();
-  (*app->prg2)();
-  app->emptyVAO->unbind();
-
-  TwDraw();
-  app->window->swap();
-  //app->kernel.variableRegister->getVariable("time")->update(app->timer.elapsedFromStart());
-  //app->kernel.variableRegister->getVariable("frameTime")->update(app->timer.elapsedFromLast());
-  //app->kernel.variableRegister->getVariable("fps")->update((uint32_t)*app->kernel.variable("frameCounter")/(float)*app->kernel.variable("time"));
-}
-
 bool Application::init(int argc,char*argv[]){
   auto argm = std::make_shared<ge::util::ArgumentManager>(argc-1,argv+1);
   ge::util::copyArgumentManager2VariableRegister(this->kernel.variableRegister,*argm,this->kernel.functionRegister);
@@ -211,20 +195,20 @@ bool Application::init(int argc,char*argv[]){
       sizeof(std::shared_ptr<AssimpModel>),
       nullptr,
       [](void*ptr){((std::shared_ptr<AssimpModel>*)ptr)->~shared_ptr();});
-  kernel.addAtomicClass<std::shared_ptr<ge::gl::Buffer>>("SharedBuffer");
   kernel.addAtomicClass<ge::util::Timer<float>>("Timer");
 
   kernel.addAtomicClass<ge::gl::Context>("GL");
 
-  kernel.addFunction({"assimpLoader","fileName"},assimpLoader);
-  kernel.addFunction({"assimpLoaderFailsafe","last","new"},assimpLoaderFailsafe,assimpLoaderFailsafeTrigger);
-  kernel.addFunction({"assimpModelToVBO","assimpModel","vbo"},assimpModelToVBO);
-  kernel.addFunction({"nofVertices","assimpModel","number"},nofVertices);
   //script part
   kernel.addArrayType("vec3",3,"f32");
   kernel.addArrayType("mat4",16,"f32");
   kernel.addArrayType(ge::de::keyword<float[16]>(),16,"f32");
   registerPlugin(&kernel);
+  kernel.addFunction("assimpLoader",{"fileName","assimpModel"},assimpLoader);
+  kernel.addFunction("assimpLoaderFailsafe",{"last","new","lastOrNew"},assimpLoaderFailsafe,assimpLoaderFailsafeTrigger);
+  kernel.addFunction("assimpModelToVBO",{"assimpModel","vbo"},assimpModelToVBO);
+  kernel.addFunction("nofVertices",{"assimpModel","number"},nofVertices);
+
   kernel.addEnumType("ShaderType",{
       GL_VERTEX_SHADER,
       GL_TESS_CONTROL_SHADER,
@@ -259,6 +243,8 @@ bool Application::init(int argc,char*argv[]){
   kernel.addVariable("shaderDirectory"       ,std::string("shaders/"));
   kernel.addVariable("modelFileName"         ,std::string("/media/windata/ft/prace/models/cube/cube.obj"));
   kernel.addEmptyVariable("model","SharedAssimpModel");
+  kernel.addEmptyVariable("modelVertices","SharedBuffer");
+  kernel.addVariable("modelVAO"              ,std::make_shared<ge::gl::VertexArray>());
   kernel.addVariable("nofModelVertices"      ,(uint32_t)0);
   kernel.addVariable("gl"                    ,ge::gl::Context{});
   kernel.addVariable("frameCounter"          ,(uint32_t)0);
@@ -270,17 +256,18 @@ bool Application::init(int argc,char*argv[]){
   keyboard::registerKeyboard(&kernel);
   mouse::registerMouse(&kernel);
 
-  kernel.addFunction({"Timer::elapsedFromLast" ,"time"},&ge::util::Timer<float>::elapsedFromLast );
-  kernel.addFunction({"Timer::elapsedFromStart","time"},&ge::util::Timer<float>::elapsedFromStart);
-  kernel.addFunction({"glDrawArrays","mode","first","count"},&ge::gl::Context::glDrawArrays);
-  kernel.addFunction({"computeProjection","projectionMatrix","fovy","aspect","near","far"},glm::perspective<float>);
-  kernel.addFunction({"computeViewRotation","viewRotation","rotx","roty","rotz"},computeViewRotation);
-  kernel.addFunction({"computeView","viewMatrix","viewRotation","position"},computeView);
-  kernel.addFunction({"cameraMove","position","viewRotation","position","speed","direction","trigger"},cameraMove,cameraMoveTrigger);
-  kernel.addFunction({"cameraAddXRotation","angle","angle","sensitivity","rel","trigger"},cameraAddXRotation);
-  kernel.addFunction({"cameraAddYRotation","angle","angle","sensitivity","rel","trigger"},cameraAddYRotation);
-  kernel.addFunction({"clearMouseRel","zero"},clearMouseRel);
-  kernel.addFunction({"incrementFrameCounter","counter","counter"},incrementFrameCounter);
+  kernel.addFunction("Timer::elapsedFromLast" ,{"time"},&ge::util::Timer<float>::elapsedFromLast );
+  kernel.addFunction("Timer::elapsedFromStart",{"time"},&ge::util::Timer<float>::elapsedFromStart);
+  kernel.addFunction("glDrawArrays"         ,{"mode","first","count"},&ge::gl::Context::glDrawArrays);
+  kernel.addFunction("glClear"              ,{"mask"},&ge::gl::Context::glClear);
+  kernel.addFunction("computeProjection"    ,{"fovy","aspect","near","far","projectionMatrix"},glm::perspective<float>);
+  kernel.addFunction("computeViewRotation"  ,{"rotx","roty","rotz","viewRotation"},computeViewRotation);
+  kernel.addFunction("computeView"          ,{"viewRotation","position","viewMatrix"},computeView);
+  kernel.addFunction("cameraMove"           ,{"viewRotation","position","speed","direction","trigger","position"},cameraMove,cameraMoveTrigger);
+  kernel.addFunction("cameraAddXRotation"   ,{"sensitivity","rel","trigger","angle","angle"},cameraAddXRotation);
+  kernel.addFunction("cameraAddYRotation"   ,{"angle","sensitivity","rel","trigger","angle"},cameraAddYRotation);
+  kernel.addFunction("clearMouseRel"        ,{"zero"},clearMouseRel);
+  kernel.addFunction("incrementFrameCounter",{"counter","counter"},incrementFrameCounter);
   {
     auto a = kernel.createFunctionNodeFactory("shaderSourceLoader");
     auto b = kernel.createFunctionNodeFactory("shaderSourceLoader");
@@ -305,63 +292,69 @@ bool Application::init(int argc,char*argv[]){
 
 
 
-  this->prg2 = std::make_shared<ge::de::Body>(true);
-
-  this->prg2->toBody()->addStatement(
+  this->idleScript = std::make_shared<ge::de::Body>(true);
+  this->idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("glClear","gl",kernel.createVariable<GLbitfield>(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)));
+  this->idleScript->toBody()->addStatement(
       kernel.createFce("assimpLoaderFailsafe","model",kernel.createFce("assimpLoader","modelFileName"),"model"));
-  this->prg2->toBody()->addStatement(kernel.createFce("nofVertices","model","nofModelVertices"));
-  auto programStatementIndex = this->prg2->toBody()->addStatement(kernel.createFce("createVSFSProgram","program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"));
-  this->prg2->toBody()->addStatement(
-      kernel.createAlwaysExecFce("Program::use",kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(programStatementIndex)->toFunction()->getOutputData())));
-  this->prg2->toBody()->addStatement(kernel.createFce("Program::set3fv",
-        kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
+  this->idleScript->toBody()->addStatement(kernel.createFce("nofVertices","model","nofModelVertices"));
+  this->idleScript->toBody()->addStatement(kernel.createFce("assimpModelToVBO","model","modelVertices"));
+  auto programStatementIndex = this->idleScript->toBody()->addStatement(kernel.createFce("createVSFSProgram","program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"));
+  this->idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("VertexArray::bind",kernel.createFce("sharedVertexArray2VertexArray*","modelVAO")));
+  this->idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("Program::use",kernel.createFce("sharedProgram2Program*",this->idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData())));
+  this->idleScript->toBody()->addStatement(kernel.createFce("Program::set3fv",
+        kernel.createFce("sharedProgram2Program*",this->idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("position"),
         kernel.createFce("f32[3]2f32*","camera.position"),
         kernel.createVariable<GLsizei>(1)
         ));
-  this->prg2->toBody()->addStatement(kernel.createFce("cameraAddXRotation",
+  this->idleScript->toBody()->addStatement(kernel.createFce("cameraAddXRotation",
         "camera.rotX","camera.sensitivity","mouse.yrel","mouse.left","camera.rotX"));
-  this->prg2->toBody()->addStatement(kernel.createFce("cameraAddYRotation",
+  this->idleScript->toBody()->addStatement(kernel.createFce("cameraAddYRotation",
         "camera.rotY","camera.sensitivity","mouse.xrel","mouse.left","camera.rotY"));
-  this->prg2->toBody()->addStatement(
+  this->idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("clearMouseRel","mouse.xrel"));
-  this->prg2->toBody()->addStatement(
+  this->idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("clearMouseRel","mouse.yrel"));
-  this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
+  this->idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(-3),"keyboard.W","camera.position"));
-  this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
+  this->idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(+3),"keyboard.S","camera.position"));
-  this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
+  this->idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(-1),"keyboard.A","camera.position"));
-  this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
+  this->idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(+1),"keyboard.D","camera.position"));
-  this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
+  this->idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(+2),"keyboard.Space","camera.position"));
-  this->prg2->toBody()->addStatement(kernel.createFce("cameraMove",
+  this->idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(-2),"keyboard.Left Shift","camera.position"));
-  this->prg2->toBody()->addStatement(kernel.createFce("computeViewRotation",
+  this->idleScript->toBody()->addStatement(kernel.createFce("computeViewRotation",
         "camera.rotX","camera.rotY","camera.rotZ","camera.viewRotation"));
-  this->prg2->toBody()->addStatement(kernel.createFce("computeView",
+  this->idleScript->toBody()->addStatement(kernel.createFce("computeView",
         "camera.viewRotation","camera.position","camera.view"));
-  this->prg2->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
-        kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
+  this->idleScript->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
+        kernel.createFce("sharedProgram2Program*",this->idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("projection"),
         kernel.createFce("f32[16]2f32*","camera.projection"),
         kernel.createVariable<GLsizei>(1),
         kernel.createVariable<GLboolean>(GL_FALSE)
         ));
-  this->prg2->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
-        kernel.createFce("sharedProgram2Program*",this->prg2->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
+  this->idleScript->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
+        kernel.createFce("sharedProgram2Program*",this->idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("view"),
         kernel.createFce("f32[16]2f32*","camera.view"),
         kernel.createVariable<GLsizei>(1),
         kernel.createVariable<GLboolean>(GL_FALSE)
         ));
-  this->prg2->toBody()->addStatement(
+  this->idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("glDrawArrays","gl",kernel.createVariable<GLenum>(GL_TRIANGLE_STRIP),kernel.createVariable<GLint>(0),kernel.createVariable<GLsizei>(3)));
-  this->prg2->toBody()->addStatement(kernel.createFce("computeProjection","camera.fovy","camera.aspect","camera.near","camera.far","camera.projection"));
-  this->prg2->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
-  this->prg2->toBody()->addStatement(kernel.createAlwaysExecFce("Timer::elapsedFromStart","timer","time"));
+  this->idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("VertexArray::unbind",kernel.createFce("sharedVertexArray2VertexArray*","modelVAO")));
+  this->idleScript->toBody()->addStatement(kernel.createFce("computeProjection","camera.fovy","camera.aspect","camera.near","camera.far","camera.projection"));
+  this->idleScript->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
+  this->idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("Timer::elapsedFromStart","timer","time"));
 
   this->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister,kernel.nameRegister);
 
@@ -377,6 +370,13 @@ int main(int argc,char*argv[]){
   if(!app.init(argc,argv))return EXIT_FAILURE;
   (*app.mainLoop)();
   return EXIT_SUCCESS;
+}
+
+void Application::idle(void*d){
+  auto app = (Application*)d;
+  (*app->idleScript)();
+  TwDraw();
+  app->window->swap();
 }
 
 bool Application::eventHandler(SDL_Event const&event,void*){
