@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.0.0)
 PROJECT(AntTest)
 
 set(INCLUDES
+  include/main.h
   include/VariableRegisterManipulator.h
   include/RegisterKeyboard.h
   include/RegisterMouse.h

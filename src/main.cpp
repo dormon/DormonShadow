@@ -1,13 +1,10 @@
 #include<limits>
 #include<string>
-#include<geGL/geGL.h>
 #include<geDE/geDE.h>
-#include<geDE/Kernel.h>
 #include<geDE/FunctionNodeFactory.h>
 #include<geDE/CompositeFunctionFactory.h>
 #include<geUtil/CopyArgumentManager2VariableRegister.h>
 #include<geUtil/ArgumentManager/ArgumentManager.h>
-#include<geAd/SDLWindow/SDLWindow.h>
 #include<geCore/Text.h>
 #include<geUtil/Timer.h>
 
@@ -23,30 +20,10 @@
 #include<glm/gtc/type_ptr.hpp>
 #include<glm/gtc/matrix_access.hpp>
 
-
-#include<VariableRegisterManipulator.h>
+#include<main.h>
 #include<RegisterKeyboard.h>
 #include<RegisterMouse.h>
 #include<Functions.h>
-
-struct Application{
-  ge::de::Kernel kernel;
-  std::shared_ptr<ge::gl::Context>            gl                  = nullptr;
-  std::shared_ptr<ge::ad::SDLMainLoop>        mainLoop            = nullptr;
-  std::shared_ptr<ge::ad::SDLWindow>          window              = nullptr;
-  std::shared_ptr<ge::gl::VertexArray>        emptyVAO            = nullptr;
-  std::shared_ptr<VariableRegisterManipulator>variableManipulator = nullptr;
-  std::shared_ptr<ge::de::Statement>          idleScript          = nullptr;
-  ~Application();
-  bool init(int argc,char*argv[]);
-  static void idle(void*);
-  static bool eventHandler(SDL_Event const&,void*);
-  template<bool DOWN>
-    static bool key(SDL_Event const&,void*);
-  template<bool DOWN>
-    static bool mouseButton(SDL_Event const&,void*);
-  static bool mouseMotion(SDL_Event const&,void*);
-};
 
 class AssimpModel{
   public:
@@ -183,8 +160,6 @@ bool Application::init(int argc,char*argv[]){
   this->gl->glDepthFunc(GL_LEQUAL);
   this->gl->glDisable(GL_CULL_FACE);
   this->gl->glClearColor(0,.5,0,1);
-
-  this->emptyVAO = std::make_shared<ge::gl::VertexArray>();
 
   TwInit(TW_OPENGL_CORE,nullptr);
   TwWindowSize(this->window->getWidth(),this->window->getHeight());
