@@ -8,6 +8,7 @@ set(INCLUDES
   include/RegisterKeyboard.h
   include/RegisterMouse.h
   include/Functions.h
+  include/Font.h
   )
 
 set(SOURCES

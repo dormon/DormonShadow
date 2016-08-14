@@ -24,6 +24,7 @@
 #include<RegisterKeyboard.h>
 #include<RegisterMouse.h>
 #include<Functions.h>
+#include<Font.h>
 
 class AssimpModel{
   public:
@@ -56,13 +57,10 @@ std::shared_ptr<ge::gl::Buffer>assimpModelToVBO(std::shared_ptr<AssimpModel>cons
   vertData.reserve(vertices*3);
   for(size_t i=0;i<model->mNumMeshes;++i){
     auto mesh = model->mMeshes[i];
-    for(size_t j=0;j<mesh->mNumFaces;++j){
-      for(size_t k=0;k<3;++k){
-        vertData.push_back(mesh->mVertices[mesh->mFaces[j].mIndices[k]].x);
-        vertData.push_back(mesh->mVertices[mesh->mFaces[j].mIndices[k]].y);
-        vertData.push_back(mesh->mVertices[mesh->mFaces[j].mIndices[k]].z);
-      }
-    }
+    for(size_t j=0;j<mesh->mNumFaces;++j)
+      for(size_t k=0;k<3;++k)
+        for(size_t l=0;l<3;++l)
+          vertData.push_back(mesh->mVertices[mesh->mFaces[j].mIndices[k]][l]);
   }
   return std::make_shared<ge::gl::Buffer>(vertices*sizeof(float)*3,vertData.data());
 }
@@ -74,29 +72,38 @@ std::shared_ptr<ge::gl::Buffer>assimpModelToNBO(std::shared_ptr<AssimpModel>cons
   vertData.reserve(vertices*3);
   for(size_t i=0;i<model->mNumMeshes;++i){
     auto mesh = model->mMeshes[i];
-    for(size_t j=0;j<mesh->mNumFaces;++j){
-      for(size_t k=0;k<3;++k){
-        vertData.push_back(mesh->mNormals[mesh->mFaces[j].mIndices[k]].x);
-        vertData.push_back(mesh->mNormals[mesh->mFaces[j].mIndices[k]].y);
-        vertData.push_back(mesh->mNormals[mesh->mFaces[j].mIndices[k]].z);
-      }
-    }
+    for(size_t j=0;j<mesh->mNumFaces;++j)
+      for(size_t k=0;k<3;++k)
+        for(size_t l=0;l<3;++l)
+          vertData.push_back(mesh->mNormals[mesh->mFaces[j].mIndices[k]][l]);
   }
   return std::make_shared<ge::gl::Buffer>(vertices*sizeof(float)*3,vertData.data());
 }
 
-
-
+std::shared_ptr<ge::gl::Texture>createFontTexture(){
+  const uint32_t w=ge::res::font::width;
+  const uint32_t h=ge::res::font::height;
+  uint8_t bytes[w*h];
+  auto result = std::make_shared<ge::gl::Texture>(GL_TEXTURE_2D,GL_R8,0,w,h);
+  for(uint32_t i=0;i<w*h/8;++i)
+    for(size_t k=0;k<8;++k)
+      bytes[i*8+k]=255*((ge::res::font::data[i]>>k)&0x1);
+  result->setData2D(bytes,GL_RED,GL_UNSIGNED_BYTE,0,0,0,w,h,w);
+  result->generateMipmap();
+  result->texParameteri(GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);
+  result->texParameteri(GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+  return result;
+}
 
 namespace ge{
   namespace de{
-    GE_DE_ADD_KEYWORD(std::shared_ptr<AssimpModel>,"SharedAssimpModel")
-    GE_DE_ADD_KEYWORD(glm::vec3,ge::de::keyword<float[3]>())
-    GE_DE_ADD_KEYWORD(glm::vec4,ge::de::keyword<float[4]>())
-    GE_DE_ADD_KEYWORD(glm::mat3,ge::de::keyword<float[3][3]>())
-    GE_DE_ADD_KEYWORD(glm::mat4,ge::de::keyword<float[4][4]>())
-    GE_DE_ADD_KEYWORD(ge::gl::Context,"GL")
-    GE_DE_ADD_KEYWORD(ge::util::Timer<float>,"Timer")
+    template<>inline std::string keyword<std::shared_ptr<AssimpModel>>(){return"SharedAssimpModel";}
+    template<>inline std::string keyword<glm::vec3>(){return ge::de::keyword<float[3]>();}
+    template<>inline std::string keyword<glm::vec4>(){return ge::de::keyword<float[4]>();}
+    template<>inline std::string keyword<glm::mat3>(){return ge::de::keyword<float[3][3]>();}
+    template<>inline std::string keyword<glm::mat4>(){return ge::de::keyword<float[4][4]>();}
+    template<>inline std::string keyword<ge::gl::Context>(){return"GL";}
+    template<>inline std::string keyword<ge::util::Timer<float>>(){return"Timer";}
   }
 }
 
@@ -416,6 +423,9 @@ bool Application::init(int argc,char*argv[]){
   this->idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("Timer::elapsedFromStart","timer","time"));
 
   this->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister,kernel.nameRegister);
+
+  this->font = createFontTexture();
+  this->font->bind(0);
   return true;
 }
 

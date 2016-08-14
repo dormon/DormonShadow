@@ -12,6 +12,7 @@ struct Application{
   std::shared_ptr<ge::ad::SDLWindow>          window              = nullptr;
   std::shared_ptr<VariableRegisterManipulator>variableManipulator = nullptr;
   std::shared_ptr<ge::de::Statement>          idleScript          = nullptr;
+  std::shared_ptr<ge::gl::Texture>font = nullptr;
   ~Application();
   bool init(int argc,char*argv[]);
   static void idle(void*);
