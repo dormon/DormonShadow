@@ -137,15 +137,18 @@ glm::vec3 cameraMove(glm::mat4 const&viewRotation,glm::vec3 const&pos,float spee
   return pos+glm::sign(direction)*speed*glm::vec3(glm::row(viewRotation,glm::abs(direction)-1));
 }
 
-float cameraAddXRotation(float angle,float sensitivity,int32_t rel,bool trigger){
+float cameraAddXRotation(float angle,float sensitivity,int32_t rel,uint32_t height,float fovy,float aspect,bool trigger){
   if(!trigger)return angle;
-  angle+=rel*sensitivity;
+  (void)aspect;
+  angle+=sensitivity*fovy*(float)rel/(float)height;
+  //angle+=rel*sensitivity;
   return glm::clamp(angle,-glm::half_pi<float>(),glm::half_pi<float>());
 }
 
-float cameraAddYRotation(float angle,float sensitivity,int32_t rel,bool trigger){
+float cameraAddYRotation(float angle,float sensitivity,int32_t rel,uint32_t width,float fovy,float aspect,bool trigger){
   if(!trigger)return angle;
-  return angle+rel*sensitivity;
+  return angle+sensitivity*fovy*aspect*(float)rel/(float)width;
+  //return angle+rel*sensitivity;
 }
 
 int32_t clearMouseRel(){return 0;}
@@ -247,7 +250,7 @@ bool Application::init(int argc,char*argv[]){
   kernel.addVariable("camera.viewRotation"   ,glm::mat4(1.f));
   kernel.addVariable("camera.view"           ,glm::mat4(1.f));
   kernel.addVariable("camera.speed"          ,0.01f);
-  kernel.addVariable("camera.sensitivity"    ,0.01f);
+  kernel.addVariable("camera.sensitivity"    ,3.0f);
   kernel.addVariable("shaderDirectory"       ,std::string("shaders/"));
   kernel.addVariable("modelFileName"         ,std::string("/media/windata/ft/prace/models/cube/cube.obj"));
   kernel.addEmptyVariable("model","SharedAssimpModel");
@@ -275,8 +278,8 @@ bool Application::init(int argc,char*argv[]){
   kernel.addFunction("computeViewRotation"  ,{"rotx","roty","rotz","viewRotation"},computeViewRotation);
   kernel.addFunction("computeView"          ,{"viewRotation","position","viewMatrix"},computeView);
   kernel.addFunction("cameraMove"           ,{"viewRotation","position","speed","direction","trigger","position"},cameraMove,cameraMoveTrigger);
-  kernel.addFunction("cameraAddXRotation"   ,{"sensitivity","rel","trigger","angle","angle"},cameraAddXRotation);
-  kernel.addFunction("cameraAddYRotation"   ,{"angle","sensitivity","rel","trigger","angle"},cameraAddYRotation);
+  kernel.addFunction("cameraAddXRotation"   ,{"angle","sensitivity","rel","height","fovy","aspect","trigger","angle"},cameraAddXRotation);
+  kernel.addFunction("cameraAddYRotation"   ,{"angle","sensitivity","rel","width","fovy","aspect","trigger","angle"},cameraAddYRotation);
   kernel.addFunction("clearMouseRel"        ,{"zero"},clearMouseRel);
   kernel.addFunction("incrementFrameCounter",{"counter","counter"},incrementFrameCounter);
   kernel.addFunction("cast<u32,i32>",{"u32","i32"},cast<uint32_t,int32_t>);
@@ -349,9 +352,9 @@ bool Application::init(int argc,char*argv[]){
   this->idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("VertexArray::bind",kernel.createFce("sharedVertexArray2VertexArray*","modelVAO")));
   this->idleScript->toBody()->addStatement(kernel.createFce("cameraAddXRotation",
-        "camera.rotX","camera.sensitivity","mouse.yrel","mouse.left","camera.rotX"));
+        "camera.rotX","camera.sensitivity","mouse.yrel","window.height","camera.fovy","camera.aspect","mouse.left","camera.rotX"));
   this->idleScript->toBody()->addStatement(kernel.createFce("cameraAddYRotation",
-        "camera.rotY","camera.sensitivity","mouse.xrel","mouse.left","camera.rotY"));
+        "camera.rotY","camera.sensitivity","mouse.xrel","window.width","camera.fovy","camera.aspect","mouse.left","camera.rotY"));
   this->idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("clearMouseRel","mouse.xrel"));
   this->idleScript->toBody()->addStatement(
