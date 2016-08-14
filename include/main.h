@@ -21,6 +21,7 @@ struct Application{
   template<bool DOWN>
     static bool mouseButton(SDL_Event const&,void*);
   static bool mouseMotion(SDL_Event const&,void*);
+  static bool resize(SDL_Event const&,void*);
 };
 
 

@@ -107,7 +107,8 @@ void registerPlugin(Kernel*kernel){
   kernel->addFunction("Program::use"         ,{"program"                                   },&ge::gl::Program::use);
   kernel->addFunction("Program::set3fv"      ,{"program","name","value","count"            },&ge::gl::Program::set3fv);
   kernel->addFunction("Program::setMatrix4fv",{"program","name","value","count","transpose"},&ge::gl::Program::setMatrix4fv);
-  kernel->addFunction("VertexArray::bind"  ,{"vertexArray"},&ge::gl::VertexArray::bind  );
-  kernel->addFunction("VertexArray::unbind",{"vertexArray"},&ge::gl::VertexArray::unbind);
+  kernel->addFunction("VertexArray::bind"     ,{"vertexArray"},&ge::gl::VertexArray::bind  );
+  kernel->addFunction("VertexArray::unbind"   ,{"vertexArray"},&ge::gl::VertexArray::unbind);
+  kernel->addFunction("VertexArray::addAttrib",{"vertexArray","sharedBuffer","index","nofComponents","type","stride","offset","normalized","divisor","ptrType"},&ge::gl::VertexArray::addAttrib);
   
 }
