@@ -3,11 +3,6 @@
 #include<geCore/ErrorPrinter.h>
 #include<Font.h>
 
-#include<glm/glm.hpp>
-#include<glm/gtc/matrix_transform.hpp>
-#include<glm/gtc/type_ptr.hpp>
-#include<glm/gtc/matrix_access.hpp>
-
 using namespace ge::gl;
 
 std::shared_ptr<ge::gl::Texture>createFontTexture(){
@@ -27,108 +22,6 @@ std::shared_ptr<ge::gl::Texture>createFontTexture(){
   return result;
 }
 
-class Drawable{
-  public:
-    enum Type{
-      LINE,
-      POINT,
-      CIRCLE,
-      TRIANGLE,
-      TEXT,
-      SPLINE,
-    }type;
-    float color[4];
-    Drawable(Type type,float r=1,float g=1,float b=1,float a=1){
-      assert(this!=nullptr);
-      this->setColor(r,g,b,a);
-      this->type = type;
-    }
-    void setColor(float r,float g,float b,float a){
-      assert(this!=nullptr);
-      this->color[0]=r;
-      this->color[1]=g;
-      this->color[2]=b;
-      this->color[3]=a;
-    }
-    virtual ~Drawable(){}
-};
-
-class Line: public Drawable{
-  public:
-    Line(float ax,float ay,float bx,float by,float w):Drawable(LINE){
-      assert(this!=nullptr);
-      this->points[0]=glm::vec2(ax,ay);
-      this->points[1]=glm::vec2(bx,by);
-      this->width = w;
-    }
-    glm::vec2 points[2];
-    float width;
-};
-
-class Point: public Drawable{
-  public:
-    Point(float x,float y,float rd):Drawable(POINT){
-      assert(this!=nullptr);
-      this->point = glm::vec2(x,y);
-      this->size = rd;
-    }
-    glm::vec2 point;
-    float size;
-};
-
-class Circle: public Drawable{
-  public:
-    Circle(float x,float y,float rd,float width):Drawable(CIRCLE){
-      assert(this!=nullptr);
-      this->point = glm::vec2(x,y);
-      this->size = rd;
-      this->width = width;
-    }
-    glm::vec2 point;
-    float size;
-    float width;
-};
-
-class Triangle: public Drawable{
-  public:
-    glm::vec2 points[3];
-    Triangle(float ax,float ay,float bx,float by,float cx,float cy):Drawable(TRIANGLE){
-      assert(this!=nullptr);
-      this->points[0]=glm::vec2(ax,ay);
-      this->points[1]=glm::vec2(bx,by);
-      this->points[2]=glm::vec2(cx,cy);
-    }
-};
-
-class Text: public Drawable{
-  public:
-    Text(std::string const&data,float size,float x,float y,float vx,float vy):Drawable(TEXT){
-      assert(this!=nullptr);
-      this->data = data;
-      this->size = size;
-      this->coord = glm::vec2(x,y);
-      this->dir = glm::vec2(vx,vy);
-    }
-    std::string data;
-    float size;
-    glm::vec2 coord;
-    glm::vec2 dir;
-};
-
-class Spline: public Drawable{
-  public:
-    Spline(float ax,float ay,float bx,float by,float cx,float cy,float dx,float dy,float width):Drawable(SPLINE){
-      assert(this!=nullptr);
-      this->points[0] = glm::vec2(ax,ay);
-      this->points[1] = glm::vec2(bx,by);
-      this->points[2] = glm::vec2(cx,cy);
-      this->points[3] = glm::vec2(dx,dy);
-      this->width = width;
-    }
-    glm::vec2 points[4];
-    float width;
-};
-
 class Viewport;
 
 struct DrawData{
@@ -147,7 +40,7 @@ class TransformNode{
   public:
     glm::mat3 mat;
     std::vector<std::shared_ptr<TransformNode>>childs;
-    std::map<size_t,std::shared_ptr<Drawable>>primitives;
+    std::map<size_t,std::shared_ptr<Primitive>>primitives;
     std::map<size_t,std::shared_ptr<Viewport>>viewports;
     std::shared_ptr<Buffer>lineBuffer;
     std::shared_ptr<VertexArray>lineVAO;
@@ -206,17 +99,79 @@ class Viewport{
       for(auto const&x:this->layers)
         x->draw(m,d);
       /*
-      gl.glEnable(GL_STENCIL_TEST);
-      gl.glStencilFunc(GL_ALWAYS,0,0);
-      gl.glClear(GL_STENCIL_BUFFER_BIT);
-      gl.glStencilOp(GL_KEEP,GL_KEEP,GL_INCR);
+         gl.glEnable(GL_STENCIL_TEST);
+         gl.glStencilFunc(GL_ALWAYS,0,0);
+         gl.glClear(GL_STENCIL_BUFFER_BIT);
+         gl.glStencilOp(GL_KEEP,GL_KEEP,GL_INCR);
 
-      gl.glDisable(GL_STENCIL_TEST);
-      */
+         gl.glDisable(GL_STENCIL_TEST);
+         */
 
 
     }
 };
+
+class Scene2D{
+  public:
+    Context gl;
+    std::shared_ptr<Program>lineProgram;
+    std::shared_ptr<Program>pointProgram;
+    std::shared_ptr<Program>circleProgram;
+    std::shared_ptr<Program>triangleProgram;
+    std::shared_ptr<Program>splineProgram;
+    std::shared_ptr<Program>textProgram;
+    std::shared_ptr<Texture>fontTexture;
+    std::map<size_t,std::shared_ptr<Viewport>>viewports;
+    std::map<size_t,std::shared_ptr<Layer>>layers;
+    std::map<size_t,std::shared_ptr<TransformNode>>nodes;
+    std::map<size_t,std::shared_ptr<Primitive>>primitives;
+    std::map<size_t,std::set<size_t>>viewportParents;
+    std::map<size_t,std::set<size_t>>layerParents;
+    std::map<size_t,std::set<size_t>>nodeParentNodes;
+    std::map<size_t,std::set<size_t>>nodeParentLayers;
+    Scene2D(Context const&g):gl(g){
+      assert(this!=nullptr);
+      this->lineProgram = std::make_shared<Program>();
+      this->lineProgram->link(
+          {std::make_shared<Shader>(GL_VERTEX_SHADER,lineVS),
+          std::make_shared<Shader>(GL_GEOMETRY_SHADER,lineGS),
+          std::make_shared<Shader>(GL_FRAGMENT_SHADER,lineFS)});
+
+      this->pointProgram = std::make_shared<Program>();
+      this->pointProgram->link(
+          {std::make_shared<Shader>(GL_VERTEX_SHADER,pointVS),
+          std::make_shared<Shader>(GL_GEOMETRY_SHADER,pointGS),
+          std::make_shared<Shader>(GL_FRAGMENT_SHADER,pointFS)});
+
+      this->circleProgram = std::make_shared<Program>();
+      this->circleProgram->link(
+          {std::make_shared<Shader>(GL_VERTEX_SHADER,circleVS),
+          std::make_shared<Shader>(GL_GEOMETRY_SHADER,circleGS),
+          std::make_shared<Shader>(GL_FRAGMENT_SHADER,circleFS)});
+
+      this->triangleProgram = std::make_shared<Program>();
+      this->triangleProgram->link(
+          {std::make_shared<Shader>(GL_VERTEX_SHADER,triangleVS),
+          std::make_shared<Shader>(GL_FRAGMENT_SHADER,triangleFS)});
+
+      this->splineProgram = std::make_shared<Program>();
+      this->splineProgram->link(
+          {std::make_shared<Shader>(GL_VERTEX_SHADER,splineVS),
+          std::make_shared<Shader>(GL_TESS_CONTROL_SHADER,splineCS),
+          std::make_shared<Shader>(GL_TESS_EVALUATION_SHADER,splineES),
+          std::make_shared<Shader>(GL_GEOMETRY_SHADER,splineGS),
+          std::make_shared<Shader>(GL_FRAGMENT_SHADER,splineFS)});
+
+      this->fontTexture = createFontTexture();
+      this->textProgram = std::make_shared<Program>();
+      this->textProgram->link(
+          {std::make_shared<Shader>(GL_VERTEX_SHADER,textVS),
+          std::make_shared<Shader>(GL_GEOMETRY_SHADER,textGS),
+          std::make_shared<Shader>(GL_FRAGMENT_SHADER,textFS)});
+    }
+};
+
+
 
 void TransformNode::draw(glm::mat3 const&m,DrawData const&d){
   glm::mat3 newMat = this->mat*m;
@@ -228,7 +183,7 @@ void TransformNode::draw(glm::mat3 const&m,DrawData const&d){
     std::vector<float>splineData;
     std::vector<float>textData;
     for(auto const&x:this->primitives){
-      if(x.second->type == Drawable::LINE){
+      if(x.second->type == Primitive::LINE){
         auto l = std::dynamic_pointer_cast<Line>(x.second);
         lineData.push_back(l->color[0]);
         lineData.push_back(l->color[1]);
@@ -240,7 +195,7 @@ void TransformNode::draw(glm::mat3 const&m,DrawData const&d){
         lineData.push_back(l->points[1].y);
         lineData.push_back(l->width);
       }
-      if(x.second->type == Drawable::POINT){
+      if(x.second->type == Primitive::POINT){
         auto l = std::dynamic_pointer_cast<Point>(x.second);
         pointData.push_back(l->color[0]);
         pointData.push_back(l->color[1]);
@@ -250,7 +205,7 @@ void TransformNode::draw(glm::mat3 const&m,DrawData const&d){
         pointData.push_back(l->point.y);
         pointData.push_back(l->size);
       }
-      if(x.second->type == Drawable::CIRCLE){
+      if(x.second->type == Primitive::CIRCLE){
         auto l = std::dynamic_pointer_cast<Circle>(x.second);
         circleData.push_back(l->color[0]);
         circleData.push_back(l->color[1]);
@@ -261,7 +216,7 @@ void TransformNode::draw(glm::mat3 const&m,DrawData const&d){
         circleData.push_back(l->size);
         circleData.push_back(l->width);
       }
-      if(x.second->type == Drawable::TRIANGLE){
+      if(x.second->type == Primitive::TRIANGLE){
         auto l = std::dynamic_pointer_cast<Triangle>(x.second);
         for(size_t i=0;i<3;++i){
           triangleData.push_back(l->color[0]);
@@ -272,7 +227,7 @@ void TransformNode::draw(glm::mat3 const&m,DrawData const&d){
           triangleData.push_back(l->points[i].y);
         }
       }
-      if(x.second->type == Drawable::SPLINE){
+      if(x.second->type == Primitive::SPLINE){
         auto l = std::dynamic_pointer_cast<Spline>(x.second);
         splineData.push_back(l->color[0]);
         splineData.push_back(l->color[1]);
@@ -284,7 +239,7 @@ void TransformNode::draw(glm::mat3 const&m,DrawData const&d){
         }
         splineData.push_back(l->width);
       }
-      if(x.second->type == Drawable::TEXT){
+      if(x.second->type == Primitive::TEXT){
         auto l = std::dynamic_pointer_cast<Text>(x.second);
         int32_t c=0;
         for(auto const&x:l->data){
@@ -292,10 +247,10 @@ void TransformNode::draw(glm::mat3 const&m,DrawData const&d){
           textData.push_back(l->color[1]);
           textData.push_back(l->color[2]);
           textData.push_back(l->color[3]);
-          textData.push_back(l->coord[0]);
-          textData.push_back(l->coord[1]);
-          textData.push_back(l->dir[0]);
-          textData.push_back(l->dir[1]);
+          textData.push_back(l->position[0]);
+          textData.push_back(l->position[1]);
+          textData.push_back(l->direction[0]);
+          textData.push_back(l->direction[1]);
           textData.push_back(c++);
           textData.push_back(x);
           textData.push_back(l->size);
@@ -380,45 +335,40 @@ void TransformNode::draw(glm::mat3 const&m,DrawData const&d){
     changed = false;
   }
 
+  glm::mat3 matrix = d.viewMatrix*newMat;
   d.lineProgram->use();
-  d.lineProgram->setMatrix3fv("modelMatrix",glm::value_ptr(newMat));
-  d.lineProgram->setMatrix3fv("viewMatrix",glm::value_ptr(d.viewMatrix));
+  d.lineProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->lineVAO->bind();
   d.gl.glDrawArrays(GL_POINTS,0,this->nofLines);
   this->lineVAO->unbind();
 
   d.pointProgram->use();
-  d.pointProgram->setMatrix3fv("modelMatrix",glm::value_ptr(newMat));
-  d.pointProgram->setMatrix3fv("viewMatrix",glm::value_ptr(d.viewMatrix));
+  d.pointProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->pointVAO->bind();
   d.gl.glDrawArrays(GL_POINTS,0,this->nofPoints);
   this->pointVAO->unbind();
 
   d.circleProgram->use();
-  d.circleProgram->setMatrix3fv("modelMatrix",glm::value_ptr(newMat));
-  d.circleProgram->setMatrix3fv("viewMatrix",glm::value_ptr(d.viewMatrix));
+  d.circleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->circleVAO->bind();
   d.gl.glDrawArrays(GL_POINTS,0,this->nofCircles);
   this->circleVAO->unbind();
 
   d.triangleProgram->use();
-  d.triangleProgram->setMatrix3fv("modelMatrix",glm::value_ptr(newMat));
-  d.triangleProgram->setMatrix3fv("viewMatrix",glm::value_ptr(d.viewMatrix));
+  d.triangleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->triangleVAO->bind();
   d.gl.glDrawArrays(GL_TRIANGLES,0,this->nofTriangles*3);
   this->triangleVAO->unbind();
 
   d.splineProgram->use();
-  d.splineProgram->setMatrix3fv("modelMatrix",glm::value_ptr(newMat));
-  d.splineProgram->setMatrix3fv("viewMatrix",glm::value_ptr(d.viewMatrix));
+  d.splineProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->splineVAO->bind();
   d.gl.glPatchParameteri(GL_PATCH_VERTICES,1);
   d.gl.glDrawArrays(GL_PATCHES,0,this->nofSplines);
   this->splineVAO->unbind();
 
   d.textProgram->use();
-  d.textProgram->setMatrix3fv("modelMatrix",glm::value_ptr(newMat));
-  d.textProgram->setMatrix3fv("viewMatrix",glm::value_ptr(d.viewMatrix));
+  d.textProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->textVAO->bind();
   d.fontTexture->bind(0);
   d.gl.glEnable(GL_BLEND);
@@ -441,18 +391,24 @@ class Draw2DImpl{
       uint32_t x = 0;
       uint32_t y = 0;
     }viewport;
-    std::map<size_t,std::shared_ptr<Drawable>>primitives;
+    std::shared_ptr<Viewport>base;
+    std::map<size_t,std::shared_ptr<Primitive>>primitives;
     float pixelSize = 1.f;
     float x = 0;
     float y = 0;
-    Draw2DImpl(Context const&g,uint32_t w,uint32_t h):gl(g){
+    Scene2D scene;
+    Draw2DImpl(Context const&g,uint32_t w,uint32_t h):gl(g),scene(g){
       assert(this!=nullptr);
       this->viewport.w = w;
       this->viewport.h = h;
+      this->base = std::make_shared<Viewport>();
+      this->base->position = glm::vec2(0.f);
+      this->base->size = glm::vec2(w,h);
+      this->base->layers.push_back(std::make_shared<Layer>());
+      this->base->layers.at(0)->root = std::make_shared<TransformNode>();
     }
     ~Draw2DImpl(){
     }
-    std::shared_ptr<Viewport>base;
     bool convertedForDrawing = false;
     std::shared_ptr<Buffer>lineBuffer;
     std::shared_ptr<VertexArray>lineVAO;
@@ -545,10 +501,34 @@ void Draw2D::draw(){
   gl.glViewport(viewport.x,viewport.y,viewport.w,viewport.h);
   gl.glClearColor(0,0,0,0);
   gl.glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
+  auto translate=glm::mat3(1.f);
+  translate[2].x = this->_impl->x;
+  translate[2].y = this->_impl->y;
+  auto scale = glm::mat3(1.f);
+  scale[0].x = this->_impl->pixelSize/this->_impl->viewport.w*2;
+  scale[1].y = this->_impl->pixelSize/this->_impl->viewport.h*2;
+  glm::mat3 viewMatrix = scale;
+  glm::mat3 modelMatrix = translate;
+  glm::mat3 matrix = viewMatrix*modelMatrix;
+
+  DrawData dd = {
+    this->_impl->lineProgram,
+    this->_impl->pointProgram,
+    this->_impl->circleProgram,
+    this->_impl->triangleProgram,
+    this->_impl->splineProgram,
+    this->_impl->textProgram,
+    this->_impl->fontTexture,
+    this->_impl->gl,
+    viewMatrix,
+  };
+
+  this->_impl->base->draw(glm::mat3(1.f),dd);
+
   if(!this->_impl->convertedForDrawing){
     std::vector<float>lineData;
     for(auto const&x:this->_impl->primitives){
-      if(x.second->type == Drawable::LINE){
+      if(x.second->type == Primitive::LINE){
         auto l = std::dynamic_pointer_cast<Line>(x.second);
         lineData.push_back(l->color[0]);
         lineData.push_back(l->color[1]);
@@ -575,7 +555,7 @@ void Draw2D::draw(){
 
     std::vector<float>pointData;
     for(auto const&x:this->_impl->primitives){
-      if(x.second->type == Drawable::POINT){
+      if(x.second->type == Primitive::POINT){
         auto l = std::dynamic_pointer_cast<Point>(x.second);
         pointData.push_back(l->color[0]);
         pointData.push_back(l->color[1]);
@@ -598,7 +578,7 @@ void Draw2D::draw(){
 
     std::vector<float>circleData;
     for(auto const&x:this->_impl->primitives){
-      if(x.second->type == Drawable::CIRCLE){
+      if(x.second->type == Primitive::CIRCLE){
         auto l = std::dynamic_pointer_cast<Circle>(x.second);
         circleData.push_back(l->color[0]);
         circleData.push_back(l->color[1]);
@@ -625,7 +605,7 @@ void Draw2D::draw(){
 
     std::vector<float>triangleData;
     for(auto const&x:this->_impl->primitives){
-      if(x.second->type == Drawable::TRIANGLE){
+      if(x.second->type == Primitive::TRIANGLE){
         auto l = std::dynamic_pointer_cast<Triangle>(x.second);
         for(size_t i=0;i<3;++i){
           triangleData.push_back(l->color[0]);
@@ -648,7 +628,7 @@ void Draw2D::draw(){
 
     std::vector<float>splineData;
     for(auto const&x:this->_impl->primitives){
-      if(x.second->type == Drawable::SPLINE){
+      if(x.second->type == Primitive::SPLINE){
         auto l = std::dynamic_pointer_cast<Spline>(x.second);
         splineData.push_back(l->color[0]);
         splineData.push_back(l->color[1]);
@@ -679,7 +659,7 @@ void Draw2D::draw(){
 
     std::vector<float>textData;
     for(auto const&x:this->_impl->primitives){
-      if(x.second->type == Drawable::TEXT){
+      if(x.second->type == Primitive::TEXT){
         auto l = std::dynamic_pointer_cast<Text>(x.second);
         int32_t c=0;
         for(auto const&x:l->data){
@@ -687,10 +667,10 @@ void Draw2D::draw(){
           textData.push_back(l->color[1]);
           textData.push_back(l->color[2]);
           textData.push_back(l->color[3]);
-          textData.push_back(l->coord[0]);
-          textData.push_back(l->coord[1]);
-          textData.push_back(l->dir[0]);
-          textData.push_back(l->dir[1]);
+          textData.push_back(l->position[0]);
+          textData.push_back(l->position[1]);
+          textData.push_back(l->direction[0]);
+          textData.push_back(l->direction[1]);
           textData.push_back(c++);
           textData.push_back(x);
           textData.push_back(l->size);
@@ -715,16 +695,6 @@ void Draw2D::draw(){
 
     this->_impl->convertedForDrawing = true;
   }
-  auto translate=glm::mat3(1.f);
-  translate[2].x = this->_impl->x;
-  translate[2].y = this->_impl->y;
-  auto scale = glm::mat3(1.f);
-  scale[0].x = this->_impl->pixelSize/this->_impl->viewport.w*2;
-  scale[1].y = this->_impl->pixelSize/this->_impl->viewport.h*2;
-  glm::mat3 viewMatrix = scale;
-  glm::mat3 modelMatrix = translate;
-  glm::mat3 matrix = viewMatrix*modelMatrix;
-
   this->_impl->lineProgram->use();
   this->_impl->lineProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->_impl->lineVAO->bind();
@@ -784,7 +754,9 @@ size_t Draw2D::addLine(float ax,float ay,float bx,float by,float w,float r,float
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
-  this->_impl->primitives[id] = std::make_shared<Line>(ax,ay,bx,by,w);
+  this->_impl->primitives[id] = std::make_shared<Line>(glm::vec2(ax,ay),glm::vec2(bx,by),w);
+  this->_impl->base->layers.at(0)->root->primitives[id] = std::make_shared<Line>(glm::vec2(ax,ay),glm::vec2(bx,by),w);
+  this->_impl->base->layers.at(0)->root->primitives[id]->color = glm::vec4(r,g,b,a);
   this->setColor(id,r,g,b,a);
   return id;
 }
@@ -793,7 +765,9 @@ size_t Draw2D::addPoint(float x,float y,float rd,float r,float g,float b,float a
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
-  this->_impl->primitives[id] = std::make_shared<Point>(x,y,rd);
+  this->_impl->primitives[id] = std::make_shared<Point>(glm::vec2(x,y),rd);
+  this->_impl->base->layers.at(0)->root->primitives[id] = std::make_shared<Point>(glm::vec2(x,y),rd);
+  this->_impl->base->layers.at(0)->root->primitives[id]->color = glm::vec4(r,g,b,a);
   this->setColor(id,r,g,b,a);
   return id;
 }
@@ -802,7 +776,9 @@ size_t Draw2D::addCircle(float x,float y,float rd,float w,float r,float g,float 
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
-  this->_impl->primitives[id] = std::make_shared<Circle>(x,y,rd,w);
+  this->_impl->primitives[id] = std::make_shared<Circle>(glm::vec2(x,y),rd,w);
+  this->_impl->base->layers.at(0)->root->primitives[id] = std::make_shared<Circle>(glm::vec2(x,y),rd,w);
+  this->_impl->base->layers.at(0)->root->primitives[id]->color = glm::vec4(r,g,b,a);
   this->setColor(id,r,g,b,a);
   return id;
 }
@@ -811,7 +787,9 @@ size_t Draw2D::addTriangle(float ax,float ay,float bx,float by,float cx,float cy
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
-  this->_impl->primitives[id] = std::make_shared<Triangle>(ax,ay,bx,by,cx,cy);
+  this->_impl->primitives[id] = std::make_shared<Triangle>(glm::vec2(ax,ay),glm::vec2(bx,by),glm::vec2(cx,cy));
+  this->_impl->base->layers.at(0)->root->primitives[id] = std::make_shared<Triangle>(glm::vec2(ax,ay),glm::vec2(bx,by),glm::vec2(cx,cy));
+  this->_impl->base->layers.at(0)->root->primitives[id]->color = glm::vec4(r,g,b,a);
   this->setColor(id,r,g,b,a);
   return id;
 }
@@ -820,7 +798,9 @@ size_t Draw2D::addText(std::string const&data,float size,float x,float y,float v
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
-  this->_impl->primitives[id] = std::make_shared<Text>(data,size,x,y,vx,vy);
+  this->_impl->primitives[id] = std::make_shared<Text>(data,size,glm::vec2(x,y),glm::vec2(vx,vy));
+  this->_impl->base->layers.at(0)->root->primitives[id] = std::make_shared<Text>(data,size,glm::vec2(x,y),glm::vec2(vx,vy));
+  this->_impl->base->layers.at(0)->root->primitives[id]->color = glm::vec4(r,g,b,a);
   this->setColor(id,r,g,b,a);
   return id;
 }
@@ -829,7 +809,9 @@ size_t Draw2D::addSpline(float ax,float ay,float bx,float by,float cx,float cy,f
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
-  this->_impl->primitives[id] = std::make_shared<Spline>(ax,ay,bx,by,cx,cy,dx,dy,width);
+  this->_impl->primitives[id] = std::make_shared<Spline>(glm::vec2(ax,ay),glm::vec2(bx,by),glm::vec2(cx,cy),glm::vec2(dx,dy),width);
+  this->_impl->base->layers.at(0)->root->primitives[id] = std::make_shared<Spline>(glm::vec2(ax,ay),glm::vec2(bx,by),glm::vec2(cx,cy),glm::vec2(dx,dy),width);
+  this->_impl->base->layers.at(0)->root->primitives[id]->color = glm::vec4(r,g,b,a);
   this->setColor(id,r,g,b,a);
   return id;
 }
@@ -843,16 +825,7 @@ void Draw2D::setColor(size_t id,float r,float g,float b,float a){
     ge::core::printError(GE_CORE_FCENAME,"no such primitive",id,r,g,b,a);
     return;
   }
-  ii->second->setColor(r,g,b,a);
-  this->_impl->convertedForDrawing = false;
-}
-
-void Draw2D::erase(size_t id){
-  assert(this!=nullptr);
-  assert(this->_impl!=nullptr);
-  auto ii=this->_impl->primitives.find(id);
-  if(ii==this->_impl->primitives.end())return;
-  this->_impl->primitives.erase(id);
+  ii->second->color = glm::vec4(r,g,b,a);
   this->_impl->convertedForDrawing = false;
 }
 
