@@ -1,6 +1,12 @@
 #include<Draw2D.h>
+#include<Draw2DShaders.h>
 #include<geCore/ErrorPrinter.h>
 #include<Font.h>
+
+#include<glm/glm.hpp>
+#include<glm/gtc/matrix_transform.hpp>
+#include<glm/gtc/type_ptr.hpp>
+#include<glm/gtc/matrix_access.hpp>
 
 using namespace ge::gl;
 
@@ -51,14 +57,11 @@ class Line: public Drawable{
   public:
     Line(float ax,float ay,float bx,float by,float w):Drawable(LINE){
       assert(this!=nullptr);
-      this->a[0]=ax;
-      this->a[1]=ay;
-      this->b[0]=bx;
-      this->b[1]=by;
+      this->points[0]=glm::vec2(ax,ay);
+      this->points[1]=glm::vec2(bx,by);
       this->width = w;
     }
-    float a[2];
-    float b[2];
+    glm::vec2 points[2];
     float width;
 };
 
@@ -66,11 +69,10 @@ class Point: public Drawable{
   public:
     Point(float x,float y,float rd):Drawable(POINT){
       assert(this!=nullptr);
-      this->coord[0]=x;
-      this->coord[1]=y;
+      this->point = glm::vec2(x,y);
       this->size = rd;
     }
-    float coord[2];
+    glm::vec2 point;
     float size;
 };
 
@@ -78,30 +80,24 @@ class Circle: public Drawable{
   public:
     Circle(float x,float y,float rd,float width):Drawable(CIRCLE){
       assert(this!=nullptr);
-      this->coord[0]=x;
-      this->coord[1]=y;
+      this->point = glm::vec2(x,y);
       this->size = rd;
       this->width = width;
     }
-    float coord[2];
+    glm::vec2 point;
     float size;
     float width;
 };
 
 class Triangle: public Drawable{
   public:
+    glm::vec2 points[3];
     Triangle(float ax,float ay,float bx,float by,float cx,float cy):Drawable(TRIANGLE){
       assert(this!=nullptr);
-      this->a[0]=ax;
-      this->a[1]=ay;
-      this->b[0]=bx;
-      this->b[1]=by;
-      this->c[0]=cx;
-      this->c[1]=cy;
+      this->points[0]=glm::vec2(ax,ay);
+      this->points[1]=glm::vec2(bx,by);
+      this->points[2]=glm::vec2(cx,cy);
     }
-    float a[2];
-    float b[2];
-    float c[2];
 };
 
 class Text: public Drawable{
@@ -110,36 +106,54 @@ class Text: public Drawable{
       assert(this!=nullptr);
       this->data = data;
       this->size = size;
-      this->coord[0] = x;
-      this->coord[1] = y;
-      this->dir[0] = vx;
-      this->dir[1] = vy;
+      this->coord = glm::vec2(x,y);
+      this->dir = glm::vec2(vx,vy);
     }
     std::string data;
     float size;
-    float coord[2];
-    float dir[2];
+    glm::vec2 coord;
+    glm::vec2 dir;
 };
 
 class Spline: public Drawable{
   public:
     Spline(float ax,float ay,float bx,float by,float cx,float cy,float dx,float dy,float width):Drawable(SPLINE){
       assert(this!=nullptr);
-      this->a[0]=ax;
-      this->a[1]=ay;
-      this->b[0]=bx;
-      this->b[1]=by;
-      this->c[0]=cx;
-      this->c[1]=cy;
-      this->d[0]=dx;
-      this->d[1]=dy;
+      this->points[0] = glm::vec2(ax,ay);
+      this->points[1] = glm::vec2(bx,by);
+      this->points[2] = glm::vec2(cx,cy);
+      this->points[3] = glm::vec2(dx,dy);
       this->width = width;
     }
-    float a[2];
-    float b[2];
-    float c[2];
-    float d[2];
+    glm::vec2 points[4];
     float width;
+};
+
+class Viewport;
+
+class TransformNode{
+  public:
+    glm::mat3 mat;
+    std::vector<std::shared_ptr<TransformNode>>childs;
+    std::map<size_t,std::shared_ptr<Drawable>>primitives;
+    std::map<size_t,std::shared_ptr<Viewport>>viewports;
+    TransformNode(){
+      this->mat = glm::mat3(1.f);
+    }
+};
+
+class Layer{
+  public:
+    Layer(){}
+    ~Layer(){}
+    std::shared_ptr<TransformNode>root;
+};
+
+class Viewport{
+  public:
+    glm::ivec2 position;
+    glm::uvec2 size;
+    std::vector<std::shared_ptr<Layer>>layers;
 };
 
 class Draw2DImpl{
@@ -151,7 +165,7 @@ class Draw2DImpl{
       uint32_t x = 0;
       uint32_t y = 0;
     }viewport;
-    std::map<size_t,Drawable*>primitives;
+    std::map<size_t,std::shared_ptr<Drawable>>primitives;
     float pixelSize = 1.f;
     float x = 0;
     float y = 0;
@@ -161,9 +175,6 @@ class Draw2DImpl{
       this->viewport.h = h;
     }
     ~Draw2DImpl(){
-      assert(this!=nullptr);
-      for(auto const&x:this->primitives)
-        delete x.second;
     }
     bool convertedForDrawing = false;
     std::shared_ptr<Buffer>lineBuffer;
@@ -196,303 +207,29 @@ class Draw2DImpl{
 Draw2D::Draw2D(Context const&gl,uint32_t w,uint32_t h){
   assert(this!=nullptr);
   this->_impl = new Draw2DImpl(gl,w,h);
-  std::string lineVS=
-    "#version 450\n"
-    "layout(location=0)in vec4  color;\n"
-    "layout(location=1)in vec2  a;\n"
-    "layout(location=2)in vec2  b;\n"
-    "layout(location=3)in float width;\n"
-    "out vec2 vA;\n"
-    "out vec2 vB;\n"
-    "out float vWidth;\n"
-    "out vec4 vColor;\n"
-    "void main(){\n"
-    "  vA = a;\n"
-    "  vB = b;\n"
-    "  vWidth = width;\n"
-    "  vColor = color;\n"
-    "}\n";
-  std::string lineGS=
-    "#version 450\n"
-    "layout(points)in;\n"
-    "layout(triangle_strip,max_vertices=4)out;\n"
-    "uniform vec2 pos = vec2(0);\n"
-    "uniform float pixelSize = 1;\n"
-    "uniform uvec2 windowSize = uvec2(1024,768);\n"
-    "in vec2 vA[];\n"
-    "in vec2 vB[];\n"
-    "in float vWidth[];\n"
-    "in vec4 vColor[];\n"
-    "out vec4 gColor;\n"
-    "void main(){\n"
-    "  vec2 v = vB[0]-vA[0];\n"
-    "  vec2 s = vA[0];\n"
-    "  vec2 r = normalize(vec2(-v.y,v.x));\n"
-    "  float w = vWidth[0];\n"
-    "  for(int i=0;i<4;++i){\n"
-    "    vec2 c = (pos+s+v*(i/2)+r*(+1-2*(i%2))*w)*pixelSize/vec2(windowSize)*2;\n"
-    "    gl_Position = vec4(c,1,1);\n"
-    "    gColor = vColor[0];\n"
-    "    EmitVertex();\n"
-    "  }\n"
-    "  EndPrimitive();\n"
-    "}\n";
-  std::string lineFS=
-    "#version 450\n"
-    "out vec4 fColor;\n"
-    "in vec4 gColor;\n"
-    "void main(){\n"
-    "  fColor = gColor;\n"
-    "}\n";
   this->_impl->lineProgram = std::make_shared<Program>();
   this->_impl->lineProgram->link(
       {std::make_shared<Shader>(GL_VERTEX_SHADER,lineVS),
       std::make_shared<Shader>(GL_GEOMETRY_SHADER,lineGS),
       std::make_shared<Shader>(GL_FRAGMENT_SHADER,lineFS)});
 
-  std::string pointVS=
-    "#version 450\n"
-    "layout(location=0)in vec4  color;\n"
-    "layout(location=1)in vec2  coord;\n"
-    "layout(location=2)in float size;\n"
-    "out vec2 vCoord;\n"
-    "out float vSize;\n"
-    "out vec4 vColor;\n"
-    "void main(){\n"
-    "  vCoord = coord;\n"
-    "  vSize = size;\n"
-    "  vColor = color;\n"
-    "}\n";
-  std::string pointGS=
-    "#version 450\n"
-    "layout(points)in;\n"
-    "layout(triangle_strip,max_vertices=4)out;\n"
-    "uniform vec2 pos = vec2(0);\n"
-    "uniform float pixelSize = 1;\n"
-    "uniform uvec2 windowSize = uvec2(1024,768);\n"
-    "in vec2 vCoord[];\n"
-    "in float vSize[];\n"
-    "in vec4 vColor[];\n"
-    "out vec4 gColor;\n"
-    "out vec2 gCoord;\n"
-    "void main(){\n"
-    "  vec2 s = vCoord[0];\n"
-    "  float w = vSize[0];\n"
-    "  for(int i=0;i<4;++i){\n"
-    "    vec2 c = (pos+s+(vec2(i/2,i%2)*2-1)*w)*pixelSize/vec2(windowSize)*2;\n"
-    "    gl_Position = vec4(c,1,1);\n"
-    "    gColor = vColor[0];\n"
-    "    gCoord = vec2(i/2,i%2);\n"
-    "    EmitVertex();\n"
-    "  }\n"
-    "  EndPrimitive();\n"
-    "}\n";
-  std::string pointFS=
-    "#version 450\n"
-    "out vec4 fColor;\n"
-    "in vec4 gColor;\n"
-    "in vec2 gCoord;\n"
-    "void main(){\n"
-    "  if(length(gCoord-vec2(0.5))>0.5)discard;\n"
-    "  fColor = gColor;\n"
-    "}\n";
   this->_impl->pointProgram = std::make_shared<Program>();
   this->_impl->pointProgram->link(
       {std::make_shared<Shader>(GL_VERTEX_SHADER,pointVS),
       std::make_shared<Shader>(GL_GEOMETRY_SHADER,pointGS),
       std::make_shared<Shader>(GL_FRAGMENT_SHADER,pointFS)});
 
-  std::string circleVS=
-    "#version 450\n"
-    "layout(location=0)in vec4  color;\n"
-    "layout(location=1)in vec2  coord;\n"
-    "layout(location=2)in float size;\n"
-    "layout(location=3)in float width;\n"
-    "out vec4 vColor;\n"
-    "out vec2 vCoord;\n"
-    "out float vSize;\n"
-    "out float vWidth;\n"
-    "void main(){\n"
-    "  vColor = color;\n"
-    "  vCoord = coord;\n"
-    "  vSize = size;\n"
-    "  vWidth = width;\n"
-    "}\n";
-  std::string circleGS=
-    "#version 450\n"
-    "layout(points)in;\n"
-    "layout(triangle_strip,max_vertices=4)out;\n"
-    "uniform vec2 pos = vec2(0);\n"
-    "uniform float pixelSize = 1;\n"
-    "uniform uvec2 windowSize = uvec2(1024,768);\n"
-    "in vec4 vColor[];\n"
-    "in vec2 vCoord[];\n"
-    "in float vSize[];\n"
-    "in float vWidth[];\n"
-    "out vec4 gColor;\n"
-    "out vec2 gCoord;\n"
-    "out float gMin;\n"
-    "void main(){\n"
-    "  vec2 s = vCoord[0];\n"
-    "  float w = vSize[0];\n"
-    "  for(int i=0;i<4;++i){\n"
-    "    vec2 c = (pos+s+(vec2(i/2,i%2)*2-1)*w)*pixelSize/vec2(windowSize)*2;\n"
-    "    gl_Position = vec4(c,1,1);\n"
-    "    gColor = vColor[0];\n"
-    "    gCoord = vec2(i/2,i%2);\n"
-    "    gMin = vWidth[0]/w;\n"
-    "    EmitVertex();\n"
-    "  }\n"
-    "  EndPrimitive();\n"
-    "}\n";
-  std::string circleFS=
-    "#version 450\n"
-    "out vec4 fColor;\n"
-    "in vec4 gColor;\n"
-    "in vec2 gCoord;\n"
-    "in float gMin;\n"
-    "void main(){\n"
-    "  float dist = length(gCoord-vec2(0.5));\n"
-    "  if(dist>0.5)discard;\n"
-    "  if(dist<0.5-gMin/2)discard;\n"
-    "  fColor = gColor;\n"
-    "}\n";
   this->_impl->circleProgram = std::make_shared<Program>();
   this->_impl->circleProgram->link(
       {std::make_shared<Shader>(GL_VERTEX_SHADER,circleVS),
       std::make_shared<Shader>(GL_GEOMETRY_SHADER,circleGS),
       std::make_shared<Shader>(GL_FRAGMENT_SHADER,circleFS)});
 
-  std::string triangleVS=
-    "#version 450\n"
-    "layout(location=0)in vec4  color;\n"
-    "layout(location=1)in vec2  coord;\n"
-    "uniform vec2 pos = vec2(0);\n"
-    "uniform float pixelSize = 1;\n"
-    "uniform uvec2 windowSize = uvec2(1024,768);\n"
-    "out vec4 vColor;\n"
-    "void main(){\n"
-    "  vec2 c = (pos+coord)*pixelSize/vec2(windowSize)*2;\n"
-    "  gl_Position = vec4(c,1,1);\n"
-    "  vColor = color;\n"
-    "}\n";
-  std::string triangleFS=
-    "#version 450\n"
-    "out vec4 fColor;\n"
-    "in vec4 vColor;\n"
-    "void main(){\n"
-    "  fColor = vColor;\n"
-    "}\n";
   this->_impl->triangleProgram = std::make_shared<Program>();
   this->_impl->triangleProgram->link(
       {std::make_shared<Shader>(GL_VERTEX_SHADER,triangleVS),
       std::make_shared<Shader>(GL_FRAGMENT_SHADER,triangleFS)});
 
-  std::string splineVS=
-    "#version 450\n"
-    "layout(location=0)in vec4  color;\n"
-    "layout(location=1)in vec2  a;\n"
-    "layout(location=2)in vec2  b;\n"
-    "layout(location=3)in vec2  c;\n"
-    "layout(location=4)in vec2  d;\n"
-    "layout(location=5)in float width;\n"
-    "out vec2 vA;\n"
-    "out vec2 vB;\n"
-    "out vec2 vC;\n"
-    "out vec2 vD;\n"
-    "out float vWidth;\n"
-    "out vec4 vColor;\n"
-    "void main(){\n"
-    "  vA = a;\n"
-    "  vB = b;\n"
-    "  vC = c;\n"
-    "  vD = d;\n"
-    "  vWidth = width;\n"
-    "  vColor = color;\n"
-    "}\n";
-  std::string splineCS=
-    "#version 450\n"
-    "layout(vertices=1)out;\n"
-    "in vec2 vA[];\n"
-    "in vec2 vB[];\n"
-    "in vec2 vC[];\n"
-    "in vec2 vD[];\n"
-    "in float vWidth[];\n"
-    "in vec4 vColor[];\n"
-    "patch out vec2 cPos[4];\n"
-    "patch out vec4 cColor;\n"
-    "patch out float cWidth;\n"
-    "void main(){\n"
-    "  cColor = vColor[0];\n"
-    "  cWidth = vWidth[0];\n"
-    "  cPos[0] = vA[0];\n"
-    "  cPos[1] = vB[0];\n"
-    "  cPos[2] = vC[0];\n"
-    "  cPos[3] = vD[0];\n"
-    "  gl_TessLevelInner[1]=64;\n"
-    "  gl_TessLevelInner[0]=1;\n"
-    "  gl_TessLevelOuter[1]=64;\n"
-    "  gl_TessLevelOuter[0]=1;\n"
-    "  gl_TessLevelOuter[2]=1;\n"
-    "  gl_TessLevelOuter[3]=1;\n"
-  "}\n";
-  std::string splineES=
-    "#version 450\n"
-    "layout(isolines,equal_spacing)in;\n"
-    "patch in vec2 cPos[4];\n"
-    "patch in vec4 cColor;\n"
-    "patch in float cWidth;\n"
-    "out vec2 eA;\n"
-    "out float eWidth;\n"
-    "out vec4 eColor;\n"
-    "float cattmulrom(float a,float b,float c,float d,float t1){\n"
-    "  float t2=t1*t1;\n"
-    "  float t3=t2*t1;\n"
-    "  return\n"
-    "    ( -.5*t3 +    t2 - .5*t1 + 0 )*a+\n"
-    "    ( 1.5*t3 -2.5*t2 + 0     + 1.)*b+\n"
-    "    (-1.5*t3 +  2*t2 + .5*t1 + 0.)*c+\n"
-    "    (  .5*t3 - .5*t2 + 0     + 0.)*d;\n"
-    "}\n"
-    "void main(){\n"
-    "  float xx=cattmulrom(cPos[0].x,cPos[1].x,cPos[2].x,cPos[3].x,gl_TessCoord.x);\n"
-    "  float yy=cattmulrom(cPos[0].y,cPos[1].y,cPos[2].y,cPos[3].y,gl_TessCoord.x);\n"
-    "  eA = vec2(xx,yy);\n"
-    "  eWidth = cWidth;\n"
-    "  eColor = cColor;\n"
-    "}\n";
-
-  std::string splineGS=
-    "#version 450\n"
-    "layout(lines)in;\n"
-    "layout(triangle_strip,max_vertices=4)out;\n"
-    "uniform vec2 pos = vec2(0);\n"
-    "uniform float pixelSize = 1;\n"
-    "uniform uvec2 windowSize = uvec2(1024,768);\n"
-    "in vec2 eA[];\n"
-    "in float eWidth[];\n"
-    "in vec4 eColor[];\n"
-    "out vec4 gColor;\n"
-    "void main(){\n"
-    "  vec2 v = eA[1]-eA[0];\n"
-    "  vec2 s = eA[0];\n"
-    "  vec2 r = normalize(vec2(-v.y,v.x));\n"
-    "  float w = eWidth[0];\n"
-    "  for(int i=0;i<4;++i){\n"
-    "    vec2 c = (pos+s+v*(i/2)+r*(+1-2*(i%2))*w)*pixelSize/vec2(windowSize)*2;\n"
-    "    gl_Position = vec4(c,1,1);\n"
-    "    gColor = eColor[0];\n"
-    "    EmitVertex();\n"
-    "  }\n"
-    "  EndPrimitive();\n"
-    "}\n";
-  std::string splineFS=
-    "#version 450\n"
-    "out vec4 fColor;\n"
-    "in vec4 gColor;\n"
-    "void main(){\n"
-    "  fColor = gColor;\n"
-    "}\n";
   this->_impl->splineProgram = std::make_shared<Program>();
   this->_impl->splineProgram->link(
       {std::make_shared<Shader>(GL_VERTEX_SHADER,splineVS),
@@ -502,80 +239,6 @@ Draw2D::Draw2D(Context const&gl,uint32_t w,uint32_t h){
       std::make_shared<Shader>(GL_FRAGMENT_SHADER,splineFS)});
 
   this->_impl->fontTexture = createFontTexture();
-  std::string textVS=
-    "#version 450\n"
-    "layout(location=0)in vec4  color ;\n"
-    "layout(location=1)in vec2  pos   ;\n"
-    "layout(location=2)in vec2  dir   ;\n"
-    "layout(location=3)in float number;\n"
-    "layout(location=4)in float char  ;\n"
-    "layout(location=5)in float size  ;\n"
-    "out vec4  vColor ;\n"
-    "out vec2  vPos   ;\n"
-    "out vec2  vDir   ;\n"
-    "out float vNumber;\n"
-    "out float vChar  ;\n"
-    "out float vSize  ;\n"
-    "void main(){\n"
-    "  vColor  = color ;\n"
-    "  vPos    = pos   ;\n"
-    "  vDir    = dir   ;\n"
-    "  vNumber = number;\n"
-    "  vChar   = char  ;\n"
-    "  vSize   = size  ;\n"
-    "}\n";
-  std::string textGS=
-    "#version 450\n"
-    "layout(points)in;\n"
-    "layout(triangle_strip,max_vertices=4)out;\n"
-    "uniform vec2 pos = vec2(0);\n"
-    "uniform float pixelSize = 1;\n"
-    "uniform uvec2 windowSize = uvec2(1024,768);\n"
-    "in vec4  vColor [];\n"
-    "in vec2  vPos   [];\n"
-    "in vec2  vDir   [];\n"
-    "in float vNumber[];\n"
-    "in float vChar  [];\n"
-    "in float vSize  [];\n"
-    "out vec4  gColor;\n"
-    "out float gChar ;\n"
-    "out vec2  gCoord;\n"
-    "void main(){\n"
-    "  vec2 v = normalize(vDir[0]);\n"
-    "  vec2 s = vPos[0];\n"
-    "  vec2 r = normalize(vec2(-v.y,v.x));\n"
-    "  float w = vSize[0];\n"
-    "  for(int i=0;i<4;++i){\n"
-    "    vec2 c = (pos+s+v*(vNumber[0]+i%2)*w+r*(i/2)*w*2)*pixelSize/vec2(windowSize)*2;\n"
-    "    gl_Position = vec4(c,1,1);\n"
-    "    gColor = vColor[0];\n"
-    "    gChar = vChar[0];\n"
-    "    gCoord = vec2(i%2,i/2);\n"
-    "    EmitVertex();\n"
-    "  }\n"
-    "  EndPrimitive();\n"
-    "}\n";
-  std::string textFS=
-    "#version 450\n"
-    "out vec4 fColor;\n"
-    "in vec4 gColor;\n"
-    "in float gChar;\n"
-    "in vec2 gCoord;\n"
-    "layout(binding=0)uniform sampler2D fontTexture;\n"
-    "const uint fontWidth = 1330;\n"
-    "const uint fontHeight = 28;\n"
-    "const uint nofCharacters = 95;\n"
-    "const uint characterWidth = fontWidth/nofCharacters;\n"
-    "const uint characterHeight = fontHeight;\n"
-    "const float characterWidthNormalized = 1.f/nofCharacters;\n"
-    "#define CH_space 32\n"
-    "float font(int ch,vec2 coord){\n"
-    "  int id = ch-CH_space;\n"
-    "  return texture(fontTexture,vec2((id+coord.x)*characterWidthNormalized,coord.y)).r;\n"
-    "}\n"
-    "void main(){\n"
-    "  fColor = vec4(gColor.rgb,font(int(gChar),gCoord));\n"
-    "}\n";
   this->_impl->textProgram = std::make_shared<Program>();
   this->_impl->textProgram->link(
       {std::make_shared<Shader>(GL_VERTEX_SHADER,textVS),
@@ -609,15 +272,15 @@ void Draw2D::draw(){
     std::vector<float>lineData;
     for(auto const&x:this->_impl->primitives){
       if(x.second->type == Drawable::LINE){
-        auto l = (Line*)x.second;
+        auto l = std::dynamic_pointer_cast<Line>(x.second);
         lineData.push_back(l->color[0]);
         lineData.push_back(l->color[1]);
         lineData.push_back(l->color[2]);
         lineData.push_back(l->color[3]);
-        lineData.push_back(l->a[0]);
-        lineData.push_back(l->a[1]);
-        lineData.push_back(l->b[0]);
-        lineData.push_back(l->b[1]);
+        lineData.push_back(l->points[0].x);
+        lineData.push_back(l->points[0].y);
+        lineData.push_back(l->points[1].x);
+        lineData.push_back(l->points[1].y);
         lineData.push_back(l->width);
       }
     }
@@ -636,13 +299,13 @@ void Draw2D::draw(){
     std::vector<float>pointData;
     for(auto const&x:this->_impl->primitives){
       if(x.second->type == Drawable::POINT){
-        auto l = (Point*)x.second;
+        auto l = std::dynamic_pointer_cast<Point>(x.second);
         pointData.push_back(l->color[0]);
         pointData.push_back(l->color[1]);
         pointData.push_back(l->color[2]);
         pointData.push_back(l->color[3]);
-        pointData.push_back(l->coord[0]);
-        pointData.push_back(l->coord[1]);
+        pointData.push_back(l->point.x);
+        pointData.push_back(l->point.y);
         pointData.push_back(l->size);
       }
     }
@@ -659,13 +322,13 @@ void Draw2D::draw(){
     std::vector<float>circleData;
     for(auto const&x:this->_impl->primitives){
       if(x.second->type == Drawable::CIRCLE){
-        auto l = (Circle*)x.second;
+        auto l = std::dynamic_pointer_cast<Circle>(x.second);
         circleData.push_back(l->color[0]);
         circleData.push_back(l->color[1]);
         circleData.push_back(l->color[2]);
         circleData.push_back(l->color[3]);
-        circleData.push_back(l->coord[0]);
-        circleData.push_back(l->coord[1]);
+        circleData.push_back(l->point.x);
+        circleData.push_back(l->point.y);
         circleData.push_back(l->size);
         circleData.push_back(l->width);
       }
@@ -686,24 +349,14 @@ void Draw2D::draw(){
     std::vector<float>triangleData;
     for(auto const&x:this->_impl->primitives){
       if(x.second->type == Drawable::TRIANGLE){
-        auto l = (Triangle*)x.second;
+        auto l = std::dynamic_pointer_cast<Triangle>(x.second);
         for(size_t i=0;i<3;++i){
           triangleData.push_back(l->color[0]);
           triangleData.push_back(l->color[1]);
           triangleData.push_back(l->color[2]);
           triangleData.push_back(l->color[3]);
-          if(i==0){
-            triangleData.push_back(l->a[0]);
-            triangleData.push_back(l->a[1]);
-          }
-          if(i==1){
-            triangleData.push_back(l->b[0]);
-            triangleData.push_back(l->b[1]);
-          }
-          if(i==2){
-            triangleData.push_back(l->c[0]);
-            triangleData.push_back(l->c[1]);
-          }
+          triangleData.push_back(l->points[i].x);
+          triangleData.push_back(l->points[i].y);
         }
       }
     }
@@ -719,19 +372,15 @@ void Draw2D::draw(){
     std::vector<float>splineData;
     for(auto const&x:this->_impl->primitives){
       if(x.second->type == Drawable::SPLINE){
-        auto l = (Spline*)x.second;
+        auto l = std::dynamic_pointer_cast<Spline>(x.second);
         splineData.push_back(l->color[0]);
         splineData.push_back(l->color[1]);
         splineData.push_back(l->color[2]);
         splineData.push_back(l->color[3]);
-        splineData.push_back(l->a[0]);
-        splineData.push_back(l->a[1]);
-        splineData.push_back(l->b[0]);
-        splineData.push_back(l->b[1]);
-        splineData.push_back(l->c[0]);
-        splineData.push_back(l->c[1]);
-        splineData.push_back(l->d[0]);
-        splineData.push_back(l->d[1]);
+        for(size_t k=0;k<4;++k){
+          splineData.push_back(l->points[k].x);
+          splineData.push_back(l->points[k].y);
+        }
         splineData.push_back(l->width);
       }
     }
@@ -754,7 +403,7 @@ void Draw2D::draw(){
     std::vector<float>textData;
     for(auto const&x:this->_impl->primitives){
       if(x.second->type == Drawable::TEXT){
-        auto l = (Text*)x.second;
+        auto l = std::dynamic_pointer_cast<Text>(x.second);
         int32_t c=0;
         for(auto const&x:l->data){
           textData.push_back(l->color[0]);
@@ -860,7 +509,7 @@ size_t Draw2D::addLine(float ax,float ay,float bx,float by,float w,float r,float
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
-  this->_impl->primitives[id] = new Line(ax,ay,bx,by,w);
+  this->_impl->primitives[id] = std::make_shared<Line>(ax,ay,bx,by,w);
   this->setColor(id,r,g,b,a);
   return id;
 }
@@ -869,7 +518,7 @@ size_t Draw2D::addPoint(float x,float y,float rd,float r,float g,float b,float a
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
-  this->_impl->primitives[id] = new Point(x,y,rd);
+  this->_impl->primitives[id] = std::make_shared<Point>(x,y,rd);
   this->setColor(id,r,g,b,a);
   return id;
 }
@@ -878,7 +527,7 @@ size_t Draw2D::addCircle(float x,float y,float rd,float w,float r,float g,float 
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
-  this->_impl->primitives[id] = new Circle(x,y,rd,w);
+  this->_impl->primitives[id] = std::make_shared<Circle>(x,y,rd,w);
   this->setColor(id,r,g,b,a);
   return id;
 }
@@ -887,7 +536,7 @@ size_t Draw2D::addTriangle(float ax,float ay,float bx,float by,float cx,float cy
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
-  this->_impl->primitives[id] = new Triangle(ax,ay,bx,by,cx,cy);
+  this->_impl->primitives[id] = std::make_shared<Triangle>(ax,ay,bx,by,cx,cy);
   this->setColor(id,r,g,b,a);
   return id;
 }
@@ -896,7 +545,7 @@ size_t Draw2D::addText(std::string const&data,float size,float x,float y,float v
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
-  this->_impl->primitives[id] = new Text(data,size,x,y,vx,vy);
+  this->_impl->primitives[id] = std::make_shared<Text>(data,size,x,y,vx,vy);
   this->setColor(id,r,g,b,a);
   return id;
 }
@@ -905,7 +554,7 @@ size_t Draw2D::addSpline(float ax,float ay,float bx,float by,float cx,float cy,f
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
-  this->_impl->primitives[id] = new Spline(ax,ay,bx,by,cx,cy,dx,dy,width);
+  this->_impl->primitives[id] = std::make_shared<Spline>(ax,ay,bx,by,cx,cy,dx,dy,width);
   this->setColor(id,r,g,b,a);
   return id;
 }
@@ -928,7 +577,6 @@ void Draw2D::erase(size_t id){
   assert(this->_impl!=nullptr);
   auto ii=this->_impl->primitives.find(id);
   if(ii==this->_impl->primitives.end())return;
-  delete ii->second;
   this->_impl->primitives.erase(id);
   this->_impl->convertedForDrawing = false;
 }
@@ -936,8 +584,5 @@ void Draw2D::erase(size_t id){
 void Draw2D::clear(){
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
-  for(auto const&x:this->_impl->primitives){
-    delete x.second;
-  }
   this->_impl->primitives.clear();
 }

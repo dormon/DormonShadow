@@ -10,6 +10,7 @@ set(INCLUDES
   include/Functions.h
   include/Font.h
   include/Draw2D.h
+  include/Draw2DShaders.h
   )
 
 set(SOURCES
