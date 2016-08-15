@@ -195,9 +195,9 @@ bool Application::init(int argc,char*argv[]){
   this->draw2D->addPoint(300,-40,1,1,0,0,1);
   this->draw2D->addCircle(-200,40,40,2,1,0,0,1);
   this->draw2D->addCircle(0,0,20,4,1,1,1,1);
-  this->draw2D->addTriangle(-12,32,12,33,-66,-66,0,.5,0,1);
+  this->draw2D->addTriangle(-12,32,120,33,-66,-66,0,.5,0,1);
   this->draw2D->addSpline(0,0,100,100,-100,100,-200,-300,1,0,0,1,1);
-  this->draw2D->addText("int main(int argc,char*argv[]){return EXIT_SUCCESS;}",8,200,-200,1,1,0,1,0,1);
+  this->draw2D->addText("int main(int argc,char*argv[]){return EXIT_SUCCESS;}",8,-50,-20,2,1,1,1,1,1);
 
   kernel.typeRegister->addType<float*>();
   kernel.addAtomicType(

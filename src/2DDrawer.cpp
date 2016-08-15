@@ -16,6 +16,8 @@ std::shared_ptr<ge::gl::Texture>createFontTexture(){
   result->generateMipmap();
   result->texParameteri(GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);
   result->texParameteri(GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+  result->texParameteri(GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+  result->texParameteri(GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
   return result;
 }
 
@@ -95,7 +97,7 @@ class Triangle: public Drawable{
       this->b[0]=bx;
       this->b[1]=by;
       this->c[0]=cx;
-      this->c[0]=cy;
+      this->c[1]=cy;
     }
     float a[2];
     float b[2];
@@ -572,7 +574,7 @@ Draw2D::Draw2D(Context const&gl,uint32_t w,uint32_t h){
     "  return texture(fontTexture,vec2((id+coord.x)*characterWidthNormalized,coord.y)).r;\n"
     "}\n"
     "void main(){\n"
-    "  fColor = gColor*font(int(gChar),gCoord);\n"
+    "  fColor = vec4(gColor.rgb,font(int(gChar),gCoord));\n"
     "}\n";
   this->_impl->textProgram = std::make_shared<Program>();
   this->_impl->textProgram->link(
@@ -834,7 +836,10 @@ void Draw2D::draw(){
   this->_impl->textProgram->set2ui("windowSize",viewport.w,viewport.h);
   this->_impl->textVAO->bind();
   this->_impl->fontTexture->bind(0);
+  this->_impl->gl.glEnable(GL_BLEND);
+  this->_impl->gl.glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
   this->_impl->gl.glDrawArrays(GL_POINTS,0,this->_impl->nofCharacters);
+  this->_impl->gl.glDisable(GL_BLEND);
   this->_impl->textVAO->unbind();
 }
 
