@@ -744,26 +744,20 @@ void Draw2D::draw(){
   this->_impl->circleVAO->unbind();
 
   this->_impl->triangleProgram->use();
-  this->_impl->triangleProgram->set1f("pixelSize",this->_impl->pixelSize);
-  this->_impl->triangleProgram->set2f("pos",this->_impl->x,this->_impl->y);
-  this->_impl->triangleProgram->set2ui("windowSize",viewport.w,viewport.h);
+  this->_impl->triangleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->_impl->triangleVAO->bind();
   this->_impl->gl.glDrawArrays(GL_TRIANGLES,0,this->_impl->nofTriangles*3);
   this->_impl->triangleVAO->unbind();
 
   this->_impl->splineProgram->use();
-  this->_impl->splineProgram->set1f("pixelSize",this->_impl->pixelSize);
-  this->_impl->splineProgram->set2f("pos",this->_impl->x,this->_impl->y);
-  this->_impl->splineProgram->set2ui("windowSize",viewport.w,viewport.h);
+  this->_impl->splineProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->_impl->splineVAO->bind();
   this->_impl->gl.glPatchParameteri(GL_PATCH_VERTICES,1);
   this->_impl->gl.glDrawArrays(GL_PATCHES,0,this->_impl->nofSplines);
   this->_impl->splineVAO->unbind();
 
   this->_impl->textProgram->use();
-  this->_impl->textProgram->set1f("pixelSize",this->_impl->pixelSize);
-  this->_impl->textProgram->set2f("pos",this->_impl->x,this->_impl->y);
-  this->_impl->textProgram->set2ui("windowSize",viewport.w,viewport.h);
+  this->_impl->textProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->_impl->textVAO->bind();
   this->_impl->fontTexture->bind(0);
   this->_impl->gl.glEnable(GL_BLEND);
