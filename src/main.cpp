@@ -198,6 +198,8 @@ bool Application::init(int argc,char*argv[]){
   this->draw2D->addTriangle(-12,32,120,33,-66,-66,0,.5,0,1);
   this->draw2D->addSpline(0,0,100,100,-100,100,-200,-300,1,0,0,1,1);
   this->draw2D->addText("int main(int argc,char*argv[]){return EXIT_SUCCESS;}",8,-50,-20,2,1,1,1,1,1);
+  this->draw2D->setPosition(100,100);
+  this->draw2D->setScale(1);
 
   kernel.typeRegister->addType<float*>();
   kernel.addAtomicType(

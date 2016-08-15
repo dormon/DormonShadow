@@ -1,4 +1,4 @@
-#include<2DDrawer.h>
+#include<Draw2D.h>
 #include<geCore/ErrorPrinter.h>
 #include<Font.h>
 

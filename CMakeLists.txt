@@ -9,7 +9,7 @@ set(INCLUDES
   include/RegisterMouse.h
   include/Functions.h
   include/Font.h
-  include/2DDrawer.h
+  include/Draw2D.h
   )
 
 set(SOURCES
@@ -18,7 +18,7 @@ set(SOURCES
   src/RegisterKeyboard.cpp
   src/RegisterMouse.cpp
   src/Functions.cpp
-  src/2DDrawer.cpp
+  src/Draw2D.cpp
   )
 
 include_directories(include /usr/local/include)

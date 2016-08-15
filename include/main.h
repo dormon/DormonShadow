@@ -4,7 +4,7 @@
 #include<geDE/Kernel.h>
 #include<geAd/SDLWindow/SDLWindow.h>
 #include<geGL/geGL.h>
-#include<2DDrawer.h>
+#include<Draw2D.h>
 
 struct Application{
   ge::de::Kernel kernel;
