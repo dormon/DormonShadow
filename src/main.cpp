@@ -80,21 +80,6 @@ std::shared_ptr<ge::gl::Buffer>assimpModelToNBO(std::shared_ptr<AssimpModel>cons
   return std::make_shared<ge::gl::Buffer>(vertices*sizeof(float)*3,vertData.data());
 }
 
-std::shared_ptr<ge::gl::Texture>createFontTexture(){
-  const uint32_t w=ge::res::font::width;
-  const uint32_t h=ge::res::font::height;
-  uint8_t bytes[w*h];
-  auto result = std::make_shared<ge::gl::Texture>(GL_TEXTURE_2D,GL_R8,0,w,h);
-  for(uint32_t i=0;i<w*h/8;++i)
-    for(size_t k=0;k<8;++k)
-      bytes[i*8+k]=255*((ge::res::font::data[i]>>k)&0x1);
-  result->setData2D(bytes,GL_RED,GL_UNSIGNED_BYTE,0,0,0,w,h,w);
-  result->generateMipmap();
-  result->texParameteri(GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);
-  result->texParameteri(GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-  return result;
-}
-
 namespace ge{
   namespace de{
     template<>inline std::string keyword<std::shared_ptr<AssimpModel>>(){return"SharedAssimpModel";}
@@ -203,6 +188,16 @@ bool Application::init(int argc,char*argv[]){
 
   TwInit(TW_OPENGL_CORE,nullptr);
   TwWindowSize(this->window->getWidth(),this->window->getHeight());
+  this->draw2D = std::make_shared<Draw2D>(*this->gl,this->window->getWidth(),this->window->getHeight());
+  this->draw2D->addLine(0,0,100,100,1,0,1,0,1);
+  this->draw2D->addLine(100,100,-100,300,2,1,1,0,1);
+  this->draw2D->addPoint(-30,-50,10,0,1,1,1);
+  this->draw2D->addPoint(300,-40,1,1,0,0,1);
+  this->draw2D->addCircle(-200,40,40,2,1,0,0,1);
+  this->draw2D->addCircle(0,0,20,4,1,1,1,1);
+  this->draw2D->addTriangle(-12,32,12,33,-66,-66,0,.5,0,1);
+  this->draw2D->addSpline(0,0,100,100,-100,100,-200,-300,1,0,0,1,1);
+  this->draw2D->addText("int main(int argc,char*argv[]){return EXIT_SUCCESS;}",8,200,-200,1,1,0,1,0,1);
 
   kernel.typeRegister->addType<float*>();
   kernel.addAtomicType(
@@ -424,8 +419,6 @@ bool Application::init(int argc,char*argv[]){
 
   this->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister,kernel.nameRegister);
 
-  this->font = createFontTexture();
-  this->font->bind(0);
   return true;
 }
 
@@ -441,8 +434,9 @@ int main(int argc,char*argv[]){
 
 void Application::idle(void*d){
   auto app = (Application*)d;
-  (*app->idleScript)();
-  TwDraw();
+  //(*app->idleScript)();
+  //TwDraw();
+  app->draw2D->draw();
   app->window->swap();
 }
 
@@ -492,6 +486,7 @@ bool Application::resize(SDL_Event const&event,void*d){
   auto &kernel = app->kernel;
   kernel.variable("window.width" )->update((uint32_t)event.window.data1);
   kernel.variable("window.height")->update((uint32_t)event.window.data2);
+  app->draw2D->setViewportSize(0,0,(uint32_t)event.window.data1,(uint32_t)event.window.data2);
   return true;
 }
 
