@@ -23,93 +23,9 @@ std::shared_ptr<ge::gl::Texture>createFontTexture(){
 }
 
 class Viewport;
-
-struct DrawData{
-  std::shared_ptr<Program>lineProgram;
-  std::shared_ptr<Program>pointProgram;
-  std::shared_ptr<Program>circleProgram;
-  std::shared_ptr<Program>triangleProgram;
-  std::shared_ptr<Program>splineProgram;
-  std::shared_ptr<Program>textProgram;
-  std::shared_ptr<Texture>fontTexture;
-  Context const&gl;
-  glm::mat3 viewMatrix;
-};
-
-class TransformNode{
-  public:
-    glm::mat3 mat;
-    std::vector<std::shared_ptr<TransformNode>>childs;
-    std::map<size_t,std::shared_ptr<Primitive>>primitives;
-    std::map<size_t,std::shared_ptr<Viewport>>viewports;
-    std::shared_ptr<Buffer>lineBuffer;
-    std::shared_ptr<VertexArray>lineVAO;
-    size_t nofLines;
-    std::shared_ptr<Buffer>pointBuffer;
-    std::shared_ptr<VertexArray>pointVAO;
-    size_t nofPoints;
-    std::shared_ptr<Buffer>circleBuffer;
-    std::shared_ptr<VertexArray>circleVAO;
-    size_t nofCircles;
-    std::shared_ptr<Buffer>triangleBuffer;
-    std::shared_ptr<VertexArray>triangleVAO;
-    size_t nofTriangles;
-    std::shared_ptr<Buffer>splineBuffer;
-    std::shared_ptr<VertexArray>splineVAO;
-    size_t nofSplines;
-    std::shared_ptr<Buffer>textBuffer;
-    std::shared_ptr<VertexArray>textVAO;
-    size_t nofCharacters;
-    bool changed = true;
-    void draw(glm::mat3 const&m,DrawData const&d);
-    TransformNode(){
-      this->mat = glm::mat3(1.f);
-    }
-};
-
-class Layer{
-  public:
-    Layer(){}
-    ~Layer(){}
-    std::shared_ptr<TransformNode>root;
-    void draw(glm::mat3 const&m,DrawData const&d){
-      if(root)root->draw(m,d);
-    }
-};
-
-class Viewport{
-  public:
-    glm::vec2 position;
-    glm::vec2 size;
-    std::vector<std::shared_ptr<Layer>>layers;
-    void draw(glm::mat3 const&m,DrawData const&d){
-      auto const&gl = d.gl;
-      glm::vec3 wp[4];
-      wp[0]=m*glm::vec3(position,1.f);
-      wp[1]=m*glm::vec3(position+glm::vec2(size.x,0.f   ),1.f);
-      wp[2]=m*glm::vec3(position+glm::vec2(0.f   ,size.y),1.f);
-      wp[3]=m*glm::vec3(position+glm::vec2(size.x,size.y),1.f);
-      glm::vec2 op=glm::vec2(
-          glm::min(glm::min(wp[0].x,wp[1].x),glm::min(wp[2].x,wp[3].x)),
-          glm::min(glm::min(wp[0].y,wp[1].y),glm::min(wp[2].y,wp[3].y)));
-      glm::vec2 os=glm::vec2(
-          glm::max(glm::max(wp[0].x,wp[1].x),glm::max(wp[2].x,wp[3].x)),
-          glm::max(glm::max(wp[0].y,wp[1].y),glm::max(wp[2].y,wp[3].y)))-op;
-      gl.glViewport(op.x,op.y,os.x,os.y);
-      for(auto const&x:this->layers)
-        x->draw(m,d);
-      /*
-         gl.glEnable(GL_STENCIL_TEST);
-         gl.glStencilFunc(GL_ALWAYS,0,0);
-         gl.glClear(GL_STENCIL_BUFFER_BIT);
-         gl.glStencilOp(GL_KEEP,GL_KEEP,GL_INCR);
-
-         gl.glDisable(GL_STENCIL_TEST);
-         */
-
-
-    }
-};
+class Layer;
+class Node;
+class Primitive;
 
 class Scene2D{
   public:
@@ -123,7 +39,7 @@ class Scene2D{
     std::shared_ptr<Texture>fontTexture;
     std::map<size_t,std::shared_ptr<Viewport>>viewports;
     std::map<size_t,std::shared_ptr<Layer>>layers;
-    std::map<size_t,std::shared_ptr<TransformNode>>nodes;
+    std::map<size_t,std::shared_ptr<Node>>nodes;
     std::map<size_t,std::shared_ptr<Primitive>>primitives;
     std::map<size_t,std::set<size_t>>viewportParents;
     std::map<size_t,std::set<size_t>>layerParents;
@@ -171,10 +87,85 @@ class Scene2D{
     }
 };
 
+class Node{
+  public:
+    glm::mat3 mat;
+    std::vector<std::shared_ptr<Node>>childs;
+    std::map<size_t,std::shared_ptr<Primitive>>primitives;
+    std::map<size_t,std::shared_ptr<Viewport>>viewports;
+    std::shared_ptr<Buffer>lineBuffer;
+    std::shared_ptr<VertexArray>lineVAO;
+    size_t nofLines;
+    std::shared_ptr<Buffer>pointBuffer;
+    std::shared_ptr<VertexArray>pointVAO;
+    size_t nofPoints;
+    std::shared_ptr<Buffer>circleBuffer;
+    std::shared_ptr<VertexArray>circleVAO;
+    size_t nofCircles;
+    std::shared_ptr<Buffer>triangleBuffer;
+    std::shared_ptr<VertexArray>triangleVAO;
+    size_t nofTriangles;
+    std::shared_ptr<Buffer>splineBuffer;
+    std::shared_ptr<VertexArray>splineVAO;
+    size_t nofSplines;
+    std::shared_ptr<Buffer>textBuffer;
+    std::shared_ptr<VertexArray>textVAO;
+    size_t nofCharacters;
+    bool changed = true;
+    void draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D const&scene);
+    Node(){
+      this->mat = glm::mat3(1.f);
+    }
+};
+
+class Layer{
+  public:
+    Layer(){}
+    ~Layer(){}
+    std::shared_ptr<Node>root;
+    void draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D const&scene){
+      if(root)root->draw(modelMatrix,viewMatrix,scene);
+    }
+};
+
+class Viewport{
+  public:
+    glm::vec2 position;
+    glm::vec2 size;
+    std::vector<std::shared_ptr<Layer>>layers;
+    void draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D const&scene){
+      auto const&gl = scene.gl;
+      glm::vec3 wp[4];
+      wp[0]=modelMatrix*glm::vec3(position,1.f);
+      wp[1]=modelMatrix*glm::vec3(position+glm::vec2(size.x,0.f   ),1.f);
+      wp[2]=modelMatrix*glm::vec3(position+glm::vec2(0.f   ,size.y),1.f);
+      wp[3]=modelMatrix*glm::vec3(position+glm::vec2(size.x,size.y),1.f);
+      glm::vec2 op=glm::vec2(
+          glm::min(glm::min(wp[0].x,wp[1].x),glm::min(wp[2].x,wp[3].x)),
+          glm::min(glm::min(wp[0].y,wp[1].y),glm::min(wp[2].y,wp[3].y)));
+      glm::vec2 os=glm::vec2(
+          glm::max(glm::max(wp[0].x,wp[1].x),glm::max(wp[2].x,wp[3].x)),
+          glm::max(glm::max(wp[0].y,wp[1].y),glm::max(wp[2].y,wp[3].y)))-op;
+      gl.glViewport(op.x,op.y,os.x,os.y);
+      for(auto const&x:this->layers)
+        x->draw(modelMatrix,viewMatrix,scene);
+      /*
+         gl.glEnable(GL_STENCIL_TEST);
+         gl.glStencilFunc(GL_ALWAYS,0,0);
+         gl.glClear(GL_STENCIL_BUFFER_BIT);
+         gl.glStencilOp(GL_KEEP,GL_KEEP,GL_INCR);
+
+         gl.glDisable(GL_STENCIL_TEST);
+         */
 
 
-void TransformNode::draw(glm::mat3 const&m,DrawData const&d){
-  glm::mat3 newMat = this->mat*m;
+    }
+};
+
+
+
+void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D const&scene){
+  glm::mat3 newModelMatrix = this->mat*modelMatrix;
   if(changed){
     std::vector<float>lineData;
     std::vector<float>pointData;
@@ -335,50 +326,50 @@ void TransformNode::draw(glm::mat3 const&m,DrawData const&d){
     changed = false;
   }
 
-  glm::mat3 matrix = d.viewMatrix*newMat;
-  d.lineProgram->use();
-  d.lineProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
+  glm::mat3 matrix = viewMatrix*newModelMatrix;
+  scene.lineProgram->use();
+  scene.lineProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->lineVAO->bind();
-  d.gl.glDrawArrays(GL_POINTS,0,this->nofLines);
+  scene.gl.glDrawArrays(GL_POINTS,0,this->nofLines);
   this->lineVAO->unbind();
 
-  d.pointProgram->use();
-  d.pointProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
+  scene.pointProgram->use();
+  scene.pointProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->pointVAO->bind();
-  d.gl.glDrawArrays(GL_POINTS,0,this->nofPoints);
+  scene.gl.glDrawArrays(GL_POINTS,0,this->nofPoints);
   this->pointVAO->unbind();
 
-  d.circleProgram->use();
-  d.circleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
+  scene.circleProgram->use();
+  scene.circleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->circleVAO->bind();
-  d.gl.glDrawArrays(GL_POINTS,0,this->nofCircles);
+  scene.gl.glDrawArrays(GL_POINTS,0,this->nofCircles);
   this->circleVAO->unbind();
 
-  d.triangleProgram->use();
-  d.triangleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
+  scene.triangleProgram->use();
+  scene.triangleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->triangleVAO->bind();
-  d.gl.glDrawArrays(GL_TRIANGLES,0,this->nofTriangles*3);
+  scene.gl.glDrawArrays(GL_TRIANGLES,0,this->nofTriangles*3);
   this->triangleVAO->unbind();
 
-  d.splineProgram->use();
-  d.splineProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
+  scene.splineProgram->use();
+  scene.splineProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->splineVAO->bind();
-  d.gl.glPatchParameteri(GL_PATCH_VERTICES,1);
-  d.gl.glDrawArrays(GL_PATCHES,0,this->nofSplines);
+  scene.gl.glPatchParameteri(GL_PATCH_VERTICES,1);
+  scene.gl.glDrawArrays(GL_PATCHES,0,this->nofSplines);
   this->splineVAO->unbind();
 
-  d.textProgram->use();
-  d.textProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
+  scene.textProgram->use();
+  scene.textProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->textVAO->bind();
-  d.fontTexture->bind(0);
-  d.gl.glEnable(GL_BLEND);
-  d.gl.glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-  d.gl.glDrawArrays(GL_POINTS,0,this->nofCharacters);
-  d.gl.glDisable(GL_BLEND);
+  scene.fontTexture->bind(0);
+  scene.gl.glEnable(GL_BLEND);
+  scene.gl.glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+  scene.gl.glDrawArrays(GL_POINTS,0,this->nofCharacters);
+  scene.gl.glDisable(GL_BLEND);
   this->textVAO->unbind();
 
   for(auto const&x:this->viewports)
-    x.second->draw(newMat,d);
+    x.second->draw(newModelMatrix,viewMatrix,scene);
 }
 
 
@@ -405,7 +396,7 @@ class Draw2DImpl{
       this->base->position = glm::vec2(0.f);
       this->base->size = glm::vec2(w,h);
       this->base->layers.push_back(std::make_shared<Layer>());
-      this->base->layers.at(0)->root = std::make_shared<TransformNode>();
+      this->base->layers.at(0)->root = std::make_shared<Node>();
     }
     ~Draw2DImpl(){
     }
@@ -511,19 +502,7 @@ void Draw2D::draw(){
   glm::mat3 modelMatrix = translate;
   glm::mat3 matrix = viewMatrix*modelMatrix;
 
-  DrawData dd = {
-    this->_impl->lineProgram,
-    this->_impl->pointProgram,
-    this->_impl->circleProgram,
-    this->_impl->triangleProgram,
-    this->_impl->splineProgram,
-    this->_impl->textProgram,
-    this->_impl->fontTexture,
-    this->_impl->gl,
-    viewMatrix,
-  };
-
-  this->_impl->base->draw(glm::mat3(1.f),dd);
+  this->_impl->base->draw(glm::mat3(1.f),viewMatrix,this->_impl->scene);
 
   if(!this->_impl->convertedForDrawing){
     std::vector<float>lineData;
