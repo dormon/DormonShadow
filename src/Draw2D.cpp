@@ -131,12 +131,44 @@ class Spline: public Drawable{
 
 class Viewport;
 
+struct DrawData{
+  std::shared_ptr<Program>lineProgram;
+  std::shared_ptr<Program>pointProgram;
+  std::shared_ptr<Program>circleProgram;
+  std::shared_ptr<Program>triangleProgram;
+  std::shared_ptr<Program>splineProgram;
+  std::shared_ptr<Program>textProgram;
+  std::shared_ptr<Texture>fontTexture;
+  Context const&gl;
+  glm::mat3 viewMatrix;
+};
+
 class TransformNode{
   public:
     glm::mat3 mat;
     std::vector<std::shared_ptr<TransformNode>>childs;
     std::map<size_t,std::shared_ptr<Drawable>>primitives;
     std::map<size_t,std::shared_ptr<Viewport>>viewports;
+    std::shared_ptr<Buffer>lineBuffer;
+    std::shared_ptr<VertexArray>lineVAO;
+    size_t nofLines;
+    std::shared_ptr<Buffer>pointBuffer;
+    std::shared_ptr<VertexArray>pointVAO;
+    size_t nofPoints;
+    std::shared_ptr<Buffer>circleBuffer;
+    std::shared_ptr<VertexArray>circleVAO;
+    size_t nofCircles;
+    std::shared_ptr<Buffer>triangleBuffer;
+    std::shared_ptr<VertexArray>triangleVAO;
+    size_t nofTriangles;
+    std::shared_ptr<Buffer>splineBuffer;
+    std::shared_ptr<VertexArray>splineVAO;
+    size_t nofSplines;
+    std::shared_ptr<Buffer>textBuffer;
+    std::shared_ptr<VertexArray>textVAO;
+    size_t nofCharacters;
+    bool changed = true;
+    void draw(glm::mat3 const&m,DrawData const&d);
     TransformNode(){
       this->mat = glm::mat3(1.f);
     }
@@ -147,19 +179,263 @@ class Layer{
     Layer(){}
     ~Layer(){}
     std::shared_ptr<TransformNode>root;
+    void draw(glm::mat3 const&m,DrawData const&d){
+      if(root)root->draw(m,d);
+    }
 };
 
 class Viewport{
   public:
-    glm::ivec2 position;
-    glm::uvec2 size;
+    glm::vec2 position;
+    glm::vec2 size;
     std::vector<std::shared_ptr<Layer>>layers;
+    void draw(glm::mat3 const&m,DrawData const&d){
+      auto const&gl = d.gl;
+      glm::vec3 wp[4];
+      wp[0]=m*glm::vec3(position,1.f);
+      wp[1]=m*glm::vec3(position+glm::vec2(size.x,0.f   ),1.f);
+      wp[2]=m*glm::vec3(position+glm::vec2(0.f   ,size.y),1.f);
+      wp[3]=m*glm::vec3(position+glm::vec2(size.x,size.y),1.f);
+      glm::vec2 op=glm::vec2(
+          glm::min(glm::min(wp[0].x,wp[1].x),glm::min(wp[2].x,wp[3].x)),
+          glm::min(glm::min(wp[0].y,wp[1].y),glm::min(wp[2].y,wp[3].y)));
+      glm::vec2 os=glm::vec2(
+          glm::max(glm::max(wp[0].x,wp[1].x),glm::max(wp[2].x,wp[3].x)),
+          glm::max(glm::max(wp[0].y,wp[1].y),glm::max(wp[2].y,wp[3].y)))-op;
+      gl.glViewport(op.x,op.y,os.x,os.y);
+      for(auto const&x:this->layers)
+        x->draw(m,d);
+      /*
+      gl.glEnable(GL_STENCIL_TEST);
+      gl.glStencilFunc(GL_ALWAYS,0,0);
+      gl.glClear(GL_STENCIL_BUFFER_BIT);
+      gl.glStencilOp(GL_KEEP,GL_KEEP,GL_INCR);
+
+      gl.glDisable(GL_STENCIL_TEST);
+      */
+
+
+    }
 };
+
+void TransformNode::draw(glm::mat3 const&m,DrawData const&d){
+  glm::mat3 newMat = this->mat*m;
+  if(changed){
+    std::vector<float>lineData;
+    std::vector<float>pointData;
+    std::vector<float>circleData;
+    std::vector<float>triangleData;
+    std::vector<float>splineData;
+    std::vector<float>textData;
+    for(auto const&x:this->primitives){
+      if(x.second->type == Drawable::LINE){
+        auto l = std::dynamic_pointer_cast<Line>(x.second);
+        lineData.push_back(l->color[0]);
+        lineData.push_back(l->color[1]);
+        lineData.push_back(l->color[2]);
+        lineData.push_back(l->color[3]);
+        lineData.push_back(l->points[0].x);
+        lineData.push_back(l->points[0].y);
+        lineData.push_back(l->points[1].x);
+        lineData.push_back(l->points[1].y);
+        lineData.push_back(l->width);
+      }
+      if(x.second->type == Drawable::POINT){
+        auto l = std::dynamic_pointer_cast<Point>(x.second);
+        pointData.push_back(l->color[0]);
+        pointData.push_back(l->color[1]);
+        pointData.push_back(l->color[2]);
+        pointData.push_back(l->color[3]);
+        pointData.push_back(l->point.x);
+        pointData.push_back(l->point.y);
+        pointData.push_back(l->size);
+      }
+      if(x.second->type == Drawable::CIRCLE){
+        auto l = std::dynamic_pointer_cast<Circle>(x.second);
+        circleData.push_back(l->color[0]);
+        circleData.push_back(l->color[1]);
+        circleData.push_back(l->color[2]);
+        circleData.push_back(l->color[3]);
+        circleData.push_back(l->point.x);
+        circleData.push_back(l->point.y);
+        circleData.push_back(l->size);
+        circleData.push_back(l->width);
+      }
+      if(x.second->type == Drawable::TRIANGLE){
+        auto l = std::dynamic_pointer_cast<Triangle>(x.second);
+        for(size_t i=0;i<3;++i){
+          triangleData.push_back(l->color[0]);
+          triangleData.push_back(l->color[1]);
+          triangleData.push_back(l->color[2]);
+          triangleData.push_back(l->color[3]);
+          triangleData.push_back(l->points[i].x);
+          triangleData.push_back(l->points[i].y);
+        }
+      }
+      if(x.second->type == Drawable::SPLINE){
+        auto l = std::dynamic_pointer_cast<Spline>(x.second);
+        splineData.push_back(l->color[0]);
+        splineData.push_back(l->color[1]);
+        splineData.push_back(l->color[2]);
+        splineData.push_back(l->color[3]);
+        for(size_t k=0;k<4;++k){
+          splineData.push_back(l->points[k].x);
+          splineData.push_back(l->points[k].y);
+        }
+        splineData.push_back(l->width);
+      }
+      if(x.second->type == Drawable::TEXT){
+        auto l = std::dynamic_pointer_cast<Text>(x.second);
+        int32_t c=0;
+        for(auto const&x:l->data){
+          textData.push_back(l->color[0]);
+          textData.push_back(l->color[1]);
+          textData.push_back(l->color[2]);
+          textData.push_back(l->color[3]);
+          textData.push_back(l->coord[0]);
+          textData.push_back(l->coord[1]);
+          textData.push_back(l->dir[0]);
+          textData.push_back(l->dir[1]);
+          textData.push_back(c++);
+          textData.push_back(x);
+          textData.push_back(l->size);
+        }
+      }
+    }
+
+    this->lineBuffer = std::make_shared<Buffer>(lineData.size()*sizeof(float),lineData.data());
+    this->nofLines = lineData.size()/9;
+    this->lineVAO = std::make_shared<VertexArray>();
+    this->lineVAO->addAttrib(this->lineBuffer,
+        0,4,GL_FLOAT,sizeof(float)*9,sizeof(float)*0);
+    this->lineVAO->addAttrib(this->lineBuffer,
+        1,2,GL_FLOAT,sizeof(float)*9,sizeof(float)*4);
+    this->lineVAO->addAttrib(this->lineBuffer,
+        2,2,GL_FLOAT,sizeof(float)*9,sizeof(float)*6);
+    this->lineVAO->addAttrib(this->lineBuffer,
+        3,1,GL_FLOAT,sizeof(float)*9,sizeof(float)*8);
+
+    this->pointBuffer = std::make_shared<Buffer>(pointData.size()*sizeof(float),pointData.data());
+    this->nofPoints = pointData.size()/7;
+    this->pointVAO = std::make_shared<VertexArray>();
+    this->pointVAO->addAttrib(this->pointBuffer,
+        0,4,GL_FLOAT,sizeof(float)*7,sizeof(float)*0);
+    this->pointVAO->addAttrib(this->pointBuffer,
+        1,2,GL_FLOAT,sizeof(float)*7,sizeof(float)*4);
+    this->pointVAO->addAttrib(this->pointBuffer,
+        2,1,GL_FLOAT,sizeof(float)*7,sizeof(float)*6);
+
+    this->circleBuffer = std::make_shared<Buffer>(circleData.size()*sizeof(float),circleData.data());
+    this->nofCircles = circleData.size()/8;
+    this->circleVAO = std::make_shared<VertexArray>();
+    this->circleVAO->addAttrib(this->circleBuffer,
+        0,4,GL_FLOAT,sizeof(float)*8,sizeof(float)*0);
+    this->circleVAO->addAttrib(this->circleBuffer,
+        1,2,GL_FLOAT,sizeof(float)*8,sizeof(float)*4);
+    this->circleVAO->addAttrib(this->circleBuffer,
+        2,1,GL_FLOAT,sizeof(float)*8,sizeof(float)*6);
+    this->circleVAO->addAttrib(this->circleBuffer,
+        3,1,GL_FLOAT,sizeof(float)*8,sizeof(float)*7);
+
+    this->triangleBuffer = std::make_shared<Buffer>(triangleData.size()*sizeof(float),triangleData.data());
+    this->nofTriangles = triangleData.size()/6/3;
+    this->triangleVAO = std::make_shared<VertexArray>();
+    this->triangleVAO->addAttrib(this->triangleBuffer,
+        0,4,GL_FLOAT,sizeof(float)*6,sizeof(float)*0);
+    this->triangleVAO->addAttrib(this->triangleBuffer,
+        1,2,GL_FLOAT,sizeof(float)*6,sizeof(float)*4);
+
+    this->splineBuffer = std::make_shared<Buffer>(splineData.size()*sizeof(float),splineData.data());
+    this->nofSplines = splineData.size()/13;
+    this->splineVAO = std::make_shared<VertexArray>();
+    this->splineVAO->addAttrib(this->splineBuffer,
+        0,4,GL_FLOAT,sizeof(float)*13,sizeof(float)*0 );
+    this->splineVAO->addAttrib(this->splineBuffer,
+        1,2,GL_FLOAT,sizeof(float)*13,sizeof(float)*4 );
+    this->splineVAO->addAttrib(this->splineBuffer,
+        2,2,GL_FLOAT,sizeof(float)*13,sizeof(float)*6 );
+    this->splineVAO->addAttrib(this->splineBuffer,
+        3,2,GL_FLOAT,sizeof(float)*13,sizeof(float)*8 );
+    this->splineVAO->addAttrib(this->splineBuffer,
+        4,2,GL_FLOAT,sizeof(float)*13,sizeof(float)*10);
+    this->splineVAO->addAttrib(this->splineBuffer,
+        5,1,GL_FLOAT,sizeof(float)*13,sizeof(float)*12);
+
+    this->textBuffer = std::make_shared<Buffer>(textData.size()*sizeof(float),textData.data());
+    this->nofCharacters = textData.size()/11;
+    this->textVAO = std::make_shared<VertexArray>();
+    this->textVAO->addAttrib(this->textBuffer,
+        0,4,GL_FLOAT,sizeof(float)*11,sizeof(float)*0);
+    this->textVAO->addAttrib(this->textBuffer,
+        1,2,GL_FLOAT,sizeof(float)*11,sizeof(float)*4);
+    this->textVAO->addAttrib(this->textBuffer,
+        2,2,GL_FLOAT,sizeof(float)*11,sizeof(float)*6);
+    this->textVAO->addAttrib(this->textBuffer,
+        3,1,GL_FLOAT,sizeof(float)*11,sizeof(float)*8);
+    this->textVAO->addAttrib(this->textBuffer,
+        4,1,GL_FLOAT,sizeof(float)*11,sizeof(float)*9);
+    this->textVAO->addAttrib(this->textBuffer,
+        5,1,GL_FLOAT,sizeof(float)*11,sizeof(float)*10);
+
+    changed = false;
+  }
+
+  d.lineProgram->use();
+  d.lineProgram->setMatrix3fv("modelMatrix",glm::value_ptr(newMat));
+  d.lineProgram->setMatrix3fv("viewMatrix",glm::value_ptr(d.viewMatrix));
+  this->lineVAO->bind();
+  d.gl.glDrawArrays(GL_POINTS,0,this->nofLines);
+  this->lineVAO->unbind();
+
+  d.pointProgram->use();
+  d.pointProgram->setMatrix3fv("modelMatrix",glm::value_ptr(newMat));
+  d.pointProgram->setMatrix3fv("viewMatrix",glm::value_ptr(d.viewMatrix));
+  this->pointVAO->bind();
+  d.gl.glDrawArrays(GL_POINTS,0,this->nofPoints);
+  this->pointVAO->unbind();
+
+  d.circleProgram->use();
+  d.circleProgram->setMatrix3fv("modelMatrix",glm::value_ptr(newMat));
+  d.circleProgram->setMatrix3fv("viewMatrix",glm::value_ptr(d.viewMatrix));
+  this->circleVAO->bind();
+  d.gl.glDrawArrays(GL_POINTS,0,this->nofCircles);
+  this->circleVAO->unbind();
+
+  d.triangleProgram->use();
+  d.triangleProgram->setMatrix3fv("modelMatrix",glm::value_ptr(newMat));
+  d.triangleProgram->setMatrix3fv("viewMatrix",glm::value_ptr(d.viewMatrix));
+  this->triangleVAO->bind();
+  d.gl.glDrawArrays(GL_TRIANGLES,0,this->nofTriangles*3);
+  this->triangleVAO->unbind();
+
+  d.splineProgram->use();
+  d.splineProgram->setMatrix3fv("modelMatrix",glm::value_ptr(newMat));
+  d.splineProgram->setMatrix3fv("viewMatrix",glm::value_ptr(d.viewMatrix));
+  this->splineVAO->bind();
+  d.gl.glPatchParameteri(GL_PATCH_VERTICES,1);
+  d.gl.glDrawArrays(GL_PATCHES,0,this->nofSplines);
+  this->splineVAO->unbind();
+
+  d.textProgram->use();
+  d.textProgram->setMatrix3fv("modelMatrix",glm::value_ptr(newMat));
+  d.textProgram->setMatrix3fv("viewMatrix",glm::value_ptr(d.viewMatrix));
+  this->textVAO->bind();
+  d.fontTexture->bind(0);
+  d.gl.glEnable(GL_BLEND);
+  d.gl.glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+  d.gl.glDrawArrays(GL_POINTS,0,this->nofCharacters);
+  d.gl.glDisable(GL_BLEND);
+  this->textVAO->unbind();
+
+  for(auto const&x:this->viewports)
+    x.second->draw(newMat,d);
+}
+
 
 class Draw2DImpl{
   public:
     Context gl;
-    struct Viewport{
+    struct WP{
       uint32_t w;
       uint32_t h;
       uint32_t x = 0;
@@ -176,6 +452,7 @@ class Draw2DImpl{
     }
     ~Draw2DImpl(){
     }
+    std::shared_ptr<Viewport>base;
     bool convertedForDrawing = false;
     std::shared_ptr<Buffer>lineBuffer;
     std::shared_ptr<VertexArray>lineVAO;
@@ -438,26 +715,30 @@ void Draw2D::draw(){
 
     this->_impl->convertedForDrawing = true;
   }
+  auto translate=glm::mat3(1.f);
+  translate[2].x = this->_impl->x;
+  translate[2].y = this->_impl->y;
+  auto scale = glm::mat3(1.f);
+  scale[0].x = this->_impl->pixelSize/this->_impl->viewport.w*2;
+  scale[1].y = this->_impl->pixelSize/this->_impl->viewport.h*2;
+  glm::mat3 viewMatrix = scale;
+  glm::mat3 modelMatrix = translate;
+  glm::mat3 matrix = viewMatrix*modelMatrix;
+
   this->_impl->lineProgram->use();
-  this->_impl->lineProgram->set1f("pixelSize",this->_impl->pixelSize);
-  this->_impl->lineProgram->set2f("pos",this->_impl->x,this->_impl->y);
-  this->_impl->lineProgram->set2ui("windowSize",viewport.w,viewport.h);
+  this->_impl->lineProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->_impl->lineVAO->bind();
   this->_impl->gl.glDrawArrays(GL_POINTS,0,this->_impl->nofLines);
   this->_impl->lineVAO->unbind();
 
   this->_impl->pointProgram->use();
-  this->_impl->pointProgram->set1f("pixelSize",this->_impl->pixelSize);
-  this->_impl->pointProgram->set2f("pos",this->_impl->x,this->_impl->y);
-  this->_impl->pointProgram->set2ui("windowSize",viewport.w,viewport.h);
+  this->_impl->pointProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->_impl->pointVAO->bind();
   this->_impl->gl.glDrawArrays(GL_POINTS,0,this->_impl->nofPoints);
   this->_impl->pointVAO->unbind();
 
   this->_impl->circleProgram->use();
-  this->_impl->circleProgram->set1f("pixelSize",this->_impl->pixelSize);
-  this->_impl->circleProgram->set2f("pos",this->_impl->x,this->_impl->y);
-  this->_impl->circleProgram->set2ui("windowSize",viewport.w,viewport.h);
+  this->_impl->circleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->_impl->circleVAO->bind();
   this->_impl->gl.glDrawArrays(GL_POINTS,0,this->_impl->nofCircles);
   this->_impl->circleVAO->unbind();
