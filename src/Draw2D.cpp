@@ -52,72 +52,17 @@ class Scene2D{
     std::map<size_t,std::set<size_t>>nodeParentLayers;
     std::map<size_t,std::set<size_t>>primitiveParents;
     size_t rootViewport = -1;
-    void addViewportParent(size_t viewport,size_t node){
-      assert(this!=nullptr);
-      if(this->viewportParents.count(viewport)==0)
-        this->viewportParents[viewport] = std::set<size_t>();
-      this->viewportParents.at(viewport).insert(node);
+    void addParent(std::map<size_t,std::set<size_t>>&parents,size_t child,size_t parent){
+      if(parents.count(child)==0)
+        parents[child] = std::set<size_t>();
+      parents.at(child).insert(parent);
     }
-    void removeViewportParent(size_t viewport,size_t node){
-      assert(this!=nullptr);
-      if(this->viewportParents.count(viewport)==0)return;
-      this->viewportParents.at(viewport).erase(node);
-      if(this->viewportParents.at(viewport).size()==0)
-        this->viewportParents.erase(viewport);
+    void removeParent(std::map<size_t,std::set<size_t>>&parents,size_t child,size_t parent){
+      if(parents.count(child)==0)return;
+      parents.at(child).erase(parent);
+      if(parents.at(child).size()==0)
+        parents.erase(child);
     }
-    void addLayerParent(size_t layer,size_t viewport){
-      assert(this!=nullptr);
-      if(this->layerParents.count(layer)==0)
-        this->layerParents[layer] = std::set<size_t>();
-      this->layerParents.at(layer).insert(viewport);
-    }
-    void removeLayerParent(size_t layer,size_t viewport){
-      assert(this!=nullptr);
-      if(this->layerParents.count(layer)==0)return;
-      this->layerParents.at(layer).erase(viewport);
-      if(this->layerParents.at(layer).size()==0)
-        this->layerParents.erase(layer);
-    }
-    void addNodeParentNode(size_t node,size_t parentNode){
-      assert(this!=nullptr);
-      if(this->nodeParentNodes.count(node)==0)
-        this->nodeParentNodes[node] = std::set<size_t>();
-      this->nodeParentNodes.at(node).insert(parentNode);
-    }
-    void removeNodeParentNode(size_t node,size_t parentNode){
-      assert(this!=nullptr);
-      if(this->nodeParentNodes.count(node)==0)return;
-      this->nodeParentNodes.at(node).erase(parentNode);
-      if(this->nodeParentNodes.at(node).size()==0)
-        this->nodeParentNodes.erase(node);
-    }
-    void addNodeParentLayer(size_t node,size_t layer){
-      assert(this!=nullptr);
-      if(this->nodeParentLayers.count(node)==0)
-        this->nodeParentLayers[node] = std::set<size_t>();
-      this->nodeParentLayers.at(node).insert(layer);
-    }
-    void removeNodeParentLayer(size_t node,size_t layer){
-      assert(this!=nullptr);
-      if(this->nodeParentLayers.count(node)==0)return;
-      this->nodeParentLayers.at(node).erase(layer);
-      if(this->nodeParentLayers.at(node).size()==0)
-        this->nodeParentLayers.erase(node);
-    }
-    void addPrimitiveParent(size_t primitive,size_t node){
-      assert(this!=nullptr);
-      if(this->primitiveParents.count(primitive)==0)
-        this->primitiveParents[primitive] = std::set<size_t>();
-      this->primitiveParents.at(primitive).insert(node);
-    }
-    void removePrimitiveParent(size_t primitive,size_t node){
-      assert(this!=nullptr);
-      if(this->primitiveParents.count(primitive)==0)return;
-      this->primitiveParents.at(primitive).erase(node);
-      if(this->primitiveParents.at(primitive).size()==0)
-        this->primitiveParents.erase(primitive);
-    }
-
     Scene2D(Context const&g):gl(g){
       assert(this!=nullptr);
       this->lineProgram = std::make_shared<Program>();
@@ -473,9 +418,8 @@ void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&projectionMatrix,Sce
 
 class Draw2DImpl{
   public:
-    Context gl;
     Scene2D scene;
-    Draw2DImpl(Context const&g):gl(g),scene(g){}
+    Draw2DImpl(Context const&g):scene(g){}
     ~Draw2DImpl(){}
 };
 
@@ -499,7 +443,7 @@ Draw2D::~Draw2D(){
 void Draw2D::draw(){
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
-  auto const&gl=this->_impl->gl;
+  auto const&gl=this->_impl->scene.gl;
   auto&s = this->_impl->scene;
   gl.glClearColor(0,0,0,0);
   gl.glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
@@ -947,7 +891,7 @@ void Draw2D::insertLayer(size_t viewport,size_t layer){
   if(std::find(layers.begin(),layers.end(),layer)!=layers.end())return;
   layers.push_back(layer);
 
-  s.addLayerParent(layer,viewport);
+  s.addParent(s.layerParents,layer,viewport);
 }
 
 void Draw2D::insertViewport(size_t node,size_t viewport){
@@ -968,7 +912,7 @@ void Draw2D::insertViewport(size_t node,size_t viewport){
   if(std::find(viewports.begin(),viewports.end(),viewport)!=viewports.end())return;
   viewports.push_back(viewport);
 
-  s.addViewportParent(viewport,node);
+  s.addParent(s.viewportParents,viewport,node);
 }
 
 void Draw2D::insertNode(size_t toNode,size_t node){
@@ -989,7 +933,7 @@ void Draw2D::insertNode(size_t toNode,size_t node){
   if(std::find(nodes.begin(),nodes.end(),node)!=nodes.end())return;
   nodes.push_back(node);
 
-  s.addNodeParentNode(node,toNode);
+  s.addParent(s.nodeParentNodes,node,toNode);
 }
 
 void Draw2D::setLayerNode(size_t layer,size_t node){
@@ -1007,7 +951,7 @@ void Draw2D::setLayerNode(size_t layer,size_t node){
   assert(s.layers.at(layer)!=nullptr);
   s.layers.at(layer)->root = node;
 
-  s.addNodeParentLayer(node,layer);
+  s.addParent(s.nodeParentLayers,node,layer);
 }
 
 void Draw2D::insertPrimitive(size_t node,size_t primitive){
@@ -1028,7 +972,7 @@ void Draw2D::insertPrimitive(size_t node,size_t primitive){
   if(std::find(primitives.begin(),primitives.end(),primitive)!=primitives.end())return;
   primitives.push_back(primitive);
 
-  s.addPrimitiveParent(primitive,node);
+  s.addParent(s.primitiveParents,primitive,node);
   s.nodes.at(node)->changed = true;
 }
 
@@ -1048,7 +992,7 @@ void Draw2D::eraseLayer(size_t viewport,size_t layer){
   auto&layers=s.viewports.at(viewport)->layers;
   layers.erase(std::remove(layers.begin(),layers.end(),layer),layers.end());
 
-  s.removeLayerParent(layer,viewport);
+  s.removeParent(s.layerParents,layer,viewport);
 }
 
 void Draw2D::eraseViewport(size_t node,size_t viewport){
@@ -1068,7 +1012,7 @@ void Draw2D::eraseViewport(size_t node,size_t viewport){
   auto&viewports=s.nodes.at(node)->viewports;
   viewports.erase(std::remove(viewports.begin(),viewports.end(),viewport),viewports.end());
 
-  s.removeViewportParent(viewport,node);
+  s.removeParent(s.viewportParents,viewport,node);
 }
 
 void Draw2D::eraseNode(size_t fromNode,size_t node){
@@ -1088,7 +1032,7 @@ void Draw2D::eraseNode(size_t fromNode,size_t node){
   auto&nodes=s.nodes.at(fromNode)->childs;
   nodes.erase(std::remove(nodes.begin(),nodes.end(),node),nodes.end());
 
-  s.removeNodeParentNode(node,fromNode);
+  s.removeParent(s.nodeParentNodes,node,fromNode);
 }
 
 void Draw2D::eraseNode(size_t layer){
@@ -1101,7 +1045,7 @@ void Draw2D::eraseNode(size_t layer){
   }
   assert(s.layers.at(layer)!=nullptr);
   auto&node = s.layers.at(layer)->root;
-  s.removeNodeParentLayer(layer,node);
+  s.removeParent(s.nodeParentLayers,node,layer);
   node = -1;
 }
 
@@ -1122,7 +1066,7 @@ void Draw2D::erasePrimitive(size_t node,size_t primitive){
   auto&primitives=s.nodes.at(node)->primitives;
   primitives.erase(std::remove(primitives.begin(),primitives.end(),primitive),primitives.end());
 
-  s.removePrimitiveParent(primitive,node);
+  s.removeParent(s.primitiveParents,primitive,node);
   s.nodes.at(node)->changed = true;
 }
 
@@ -1135,7 +1079,7 @@ void Draw2D::deleteLayer(size_t layer){
     for(auto const&x:s.layerParents.at(layer))
       this->eraseLayer(x,layer);
   if(this->hasNode(layer))
-    s.removeNodeParentLayer(this->getNode(layer),layer);
+    s.removeParent(s.nodeParentLayers,this->getNode(layer),layer);
   s.layerParents.erase(layer);
   s.layers.erase(layer);
 }
@@ -1149,7 +1093,7 @@ void Draw2D::deleteViewport(size_t viewport){
     for(auto const&x:s.layerParents.at(viewport))
       this->eraseViewport(x,viewport);
   for(auto const&x:s.viewports.at(viewport)->layers)
-    s.removeLayerParent(x,viewport);
+    s.removeParent(s.layerParents,x,viewport);
   s.viewportParents.erase(viewport);
   s.viewports.erase(viewport);
 }
@@ -1166,11 +1110,11 @@ void Draw2D::deleteNode(size_t node){
     for(auto const&x:s.nodeParentLayers.at(node))
       this->eraseNode(x);
   for(auto const&x:s.nodes.at(node)->childs)
-    s.removeNodeParentNode(x,node);
+    s.removeParent(s.nodeParentNodes,x,node);
   for(auto const&x:s.nodes.at(node)->viewports)
-    s.removeViewportParent(x,node);
+    s.removeParent(s.viewportParents,x,node);
   for(auto const&x:s.nodes.at(node)->primitives)
-    s.removePrimitiveParent(x,node);
+    s.removeParent(s.primitiveParents,x,node);
 
   s.nodeParentNodes.erase(node);
   s.nodeParentLayers.erase(node);
