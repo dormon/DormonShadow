@@ -188,18 +188,23 @@ bool Application::init(int argc,char*argv[]){
 
   TwInit(TW_OPENGL_CORE,nullptr);
   TwWindowSize(this->window->getWidth(),this->window->getHeight());
-  this->draw2D = std::make_shared<Draw2D>(*this->gl,this->window->getWidth(),this->window->getHeight());
-  this->draw2D->addLine(0,0,100,100,1,0,1,0,1);
-  this->draw2D->addLine(100,100,-100,300,2,1,1,0,1);
-  this->draw2D->addPoint(-30,-50,10,0,1,1,1);
-  this->draw2D->addPoint(300,-40,1,1,0,0,1);
-  this->draw2D->addCircle(-200,40,40,2,1,0,0,1);
-  this->draw2D->addCircle(0,0,20,4,1,1,1,1);
-  this->draw2D->addTriangle(-12,32,120,33,-66,-66,0,.5,0,1);
-  this->draw2D->addSpline(0,0,100,100,-100,100,-200,-300,1,0,0,1,1);
-  this->draw2D->addText("int main(int argc,char*argv[]){return EXIT_SUCCESS;}",8,-50,-20,2,1,1,1,1,1);
-  this->draw2D->setCameraPosition(glm::vec2(0,0));
-  this->draw2D->setCameraScale(1.f);
+
+  this->draw2D = std::make_shared<Draw2D>(*this->gl);
+  auto vv=this->draw2D->createViewport(glm::uvec2(this->window->getWidth(),this->window->getHeight()));
+  auto ll=this->draw2D->createLayer();
+  auto nn=this->draw2D->createNode();
+  this->draw2D->insertLayer(vv,ll);
+  this->draw2D->setLayerNode(ll,nn);
+  this->draw2D->setRootViewport(vv);
+  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(0,0),glm::vec2(100,100),1,glm::vec4(0,1,0,1))));
+  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(100,100),glm::vec2(-100,300),2,glm::vec4(1,1,0,1))));
+  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Point>(glm::vec2(-30,-50),10,glm::vec4(0,1,1,1))));
+  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Point>(glm::vec2(300,-40),1,glm::vec4(1,0,0,1))));
+  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Circle>(glm::vec2(-200,40),40,2,glm::vec4(1,0,0,1))));
+  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Circle>(glm::vec2(0,0),20,4,glm::vec4(1,1,1,1))));
+  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Triangle>(glm::vec2(-12,32),glm::vec2(120,33),glm::vec2(-66,-66),glm::vec4(0,.5,0,1))));
+  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Spline>(glm::vec2(0,0),glm::vec2(100,100),glm::vec2(-100,100),glm::vec2(-200,-300),1,glm::vec4(1,0,0,1))));
+  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Text>("int main(int argc,char*argv[]){return EXIT_SUCCESS;}",8,glm::vec2(-50,-20),glm::vec2(2,1),glm::vec4(1,1,1,1))));
 
   kernel.typeRegister->addType<float*>();
   kernel.addAtomicType(
@@ -488,7 +493,9 @@ bool Application::resize(SDL_Event const&event,void*d){
   auto &kernel = app->kernel;
   kernel.variable("window.width" )->update((uint32_t)event.window.data1);
   kernel.variable("window.height")->update((uint32_t)event.window.data2);
+
   app->draw2D->setViewportSize(glm::uvec2(event.window.data1,event.window.data2));
+
   return true;
 }
 

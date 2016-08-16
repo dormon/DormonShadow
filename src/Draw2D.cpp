@@ -424,16 +424,9 @@ void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&projectionMatrix,Sce
 }
 
 
-Draw2D::Draw2D(Context const&gl,uint32_t w,uint32_t h){
+Draw2D::Draw2D(Context const&gl){
   assert(this!=nullptr);
   this->_impl = new Scene2D(gl);
-  auto vv=this->createViewport(glm::uvec2(w,h));
-  auto ll=this->createLayer();
-  auto nn=this->createNode();
-  this->insertLayer(vv,ll);
-  this->setLayerNode(ll,nn);
-  this->setRootViewport(vv);
-  this->setViewportSize(glm::uvec2(w,h));
 }
 
 Draw2D::~Draw2D(){
@@ -554,52 +547,6 @@ void Draw2D::setCameraAngle(float cameraAngle){
   assert(s->viewports.at(s->rootViewport)!=nullptr);
   s->viewports.at(s->rootViewport)->cameraAngle = cameraAngle;
 }
-
-
-
-
-size_t Draw2D::addLine(float ax,float ay,float bx,float by,float w,float r,float g,float b,float a){
-  assert(this!=nullptr);
-  assert(this->_impl!=nullptr);
-  this->insertPrimitive(0,this->createPrimitive(std::make_shared<Line>(glm::vec2(ax,ay),glm::vec2(bx,by),w,glm::vec4(r,g,b,a))));
-  return 0;
-}
-
-size_t Draw2D::addPoint(float x,float y,float rd,float r,float g,float b,float a){
-  assert(this!=nullptr);
-  assert(this->_impl!=nullptr);
-  this->insertPrimitive(0,this->createPrimitive(std::make_shared<Point>(glm::vec2(x,y),rd,glm::vec4(r,g,b,a))));
-  return 0;
-}
-
-size_t Draw2D::addCircle(float x,float y,float rd,float w,float r,float g,float b,float a){
-  assert(this!=nullptr);
-  assert(this->_impl!=nullptr);
-  this->insertPrimitive(0,this->createPrimitive(std::make_shared<Circle>(glm::vec2(x,y),rd,w,glm::vec4(r,g,b,a))));
-  return 0;
-}
-
-size_t Draw2D::addTriangle(float ax,float ay,float bx,float by,float cx,float cy,float r,float g,float b,float a){
-  assert(this!=nullptr);
-  assert(this->_impl!=nullptr);
-  this->insertPrimitive(0,this->createPrimitive(std::make_shared<Triangle>(glm::vec2(ax,ay),glm::vec2(bx,by),glm::vec2(cx,cy),glm::vec4(r,g,b,a))));
-  return 0;
-}
-
-size_t Draw2D::addText(std::string const&data,float size,float x,float y,float vx,float vy,float r,float g,float b,float a){
-  assert(this!=nullptr);
-  assert(this->_impl!=nullptr);
-  this->insertPrimitive(0,this->createPrimitive(std::make_shared<Text>(data,size,glm::vec2(x,y),glm::vec2(vx,vy),glm::vec4(r,g,b,a))));
-  return 0;
-}
-
-size_t Draw2D::addSpline(float ax,float ay,float bx,float by,float cx,float cy,float dx,float dy,float width,float r,float g,float b,float a){
-  assert(this!=nullptr);
-  assert(this->_impl!=nullptr);
-  this->insertPrimitive(0,this->createPrimitive(std::make_shared<Spline>(glm::vec2(ax,ay),glm::vec2(bx,by),glm::vec2(cx,cy),glm::vec2(dx,dy),width,glm::vec4(r,g,b,a))));
-  return 0;
-}
-
 
 void Draw2D::clear(){
   assert(this!=nullptr);
