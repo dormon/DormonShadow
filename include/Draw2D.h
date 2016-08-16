@@ -31,7 +31,7 @@ class Line: public Primitive{
   public:
     glm::vec2 points[2];
     float width;
-    Line(glm::vec2 const&a,glm::vec2 const&b,float width):Primitive(LINE){
+    Line(glm::vec2 const&a,glm::vec2 const&b,float width,glm::vec4 const&color = glm::vec4(1.f)):Primitive(LINE,color){
       assert(this!=nullptr);
       this->points[0]=a;
       this->points[1]=b;
@@ -44,7 +44,7 @@ class Point: public Primitive{
   public:
     glm::vec2 point;
     float size;
-    Point(glm::vec2 const&position,float radius):Primitive(POINT){
+    Point(glm::vec2 const&position,float radius,glm::vec4 const&color = glm::vec4(1.f)):Primitive(POINT,color){
       assert(this!=nullptr);
       this->point = position;
       this->size = radius;
@@ -57,7 +57,7 @@ class Circle: public Primitive{
     glm::vec2 point;
     float size;
     float width;
-    Circle(glm::vec2 const&position,float radius,float width):Primitive(CIRCLE){
+    Circle(glm::vec2 const&position,float radius,float width,glm::vec4 const&color = glm::vec4(1.f)):Primitive(CIRCLE,color){
       assert(this!=nullptr);
       this->point = position;
       this->size = radius;
@@ -68,7 +68,7 @@ class Circle: public Primitive{
 class Triangle: public Primitive{
   public:
     glm::vec2 points[3];
-    Triangle(glm::vec2 const&a,glm::vec2 const&b,glm::vec2 const&c):Primitive(TRIANGLE){
+    Triangle(glm::vec2 const&a,glm::vec2 const&b,glm::vec2 const&c,glm::vec4 const&color = glm::vec4(1.f)):Primitive(TRIANGLE,color){
       assert(this!=nullptr);
       this->points[0]=a;
       this->points[1]=b;
@@ -82,7 +82,7 @@ class Text: public Primitive{
     float size;
     glm::vec2 position;
     glm::vec2 direction;
-    Text(std::string const&data,float size,glm::vec2 const&position,glm::vec2 const&direction):Primitive(TEXT){
+    Text(std::string const&data,float size,glm::vec2 const&position,glm::vec2 const&direction,glm::vec4 const&color = glm::vec4(1.f)):Primitive(TEXT,color){
       assert(this!=nullptr);
       this->data = data;
       this->size = size;
@@ -93,7 +93,7 @@ class Text: public Primitive{
 
 class Spline: public Primitive{
   public:
-    Spline(glm::vec2 const&a,glm::vec2 const&b,glm::vec2 const&c,glm::vec2 const&d,float width):Primitive(SPLINE){
+    Spline(glm::vec2 const&a,glm::vec2 const&b,glm::vec2 const&c,glm::vec2 const&d,float width,glm::vec4 const&color = glm::vec4(1.f)):Primitive(SPLINE,color){
       assert(this!=nullptr);
       this->points[0] = a;
       this->points[1] = b;
@@ -112,17 +112,16 @@ class Draw2D{
   public:
     Draw2D(ge::gl::Context const&gl,uint32_t w,uint32_t h);
     ~Draw2D();
-    void setViewportSize(uint32_t x,uint32_t y,uint32_t w,uint32_t h);
     void draw();
-    void setScale(float pixelSize);
-    void setPosition(float x = 0,float y = 0);
+    void setCameraScale(float cameraScale);
+    void setCameraPosition(glm::vec2 const&cameraPosition = glm::vec2(0.f));
+    void setViewportSize(glm::uvec2 const&size);
     size_t addLine(float ax,float ay,float bx,float by,float w = 1,float r = 1,float g = 1,float b = 1,float a = 1);
     size_t addPoint(float x,float y,float rd,float r = 1,float g = 1,float b = 1,float a = 1);
     size_t addCircle(float x,float y,float rd,float w,float r = 1,float g = 1,float b = 1,float a = 1);
     size_t addTriangle(float ax,float ay,float bx,float by,float cx,float cy,float r = 1,float g = 1,float b = 1,float a = 1);
     size_t addText(std::string const&data,float size,float x,float y,float vx,float vy,float r = 1,float g = 1,float b = 1,float a = 1);
     size_t addSpline(float ax,float ay,float bx,float by,float cx,float cy,float dx,float dy,float width,float r = 1,float g = 1,float b = 1,float a = 1);
-    void setColor(size_t id,float r = 1,float g = 1,float b = 1,float a = 1);
 
 
     bool isViewport(size_t viewport)const;
@@ -133,6 +132,7 @@ class Draw2D{
     size_t getRootViewport()const;
     void setRootViewport(size_t viewport);
     bool hasRootViewport()const;
+    void eraseRootViewport();
 
     size_t getNofLayers(size_t viewport)const;
     size_t getLayer(size_t viewport,size_t i)const;
@@ -148,9 +148,11 @@ class Draw2D{
     void primitiveChanged(size_t primitive);
     glm::mat3 getNodeMatrix(size_t node)const;
     void setNodeMatrix(size_t node,glm::mat3 const&mat);
+    glm::vec2 getViewportSize(size_t viewport)const;
+    void setViewport(size_t viewport,glm::vec2 const&size);
 
     size_t createLayer();
-    size_t createViewport(glm::vec2 const&position,glm::vec2 const&size);
+    size_t createViewport(glm::uvec2 const&size);
     size_t createNode(glm::mat3 const&mat = glm::mat3(1.f));
     size_t createPrimitive(std::shared_ptr<Primitive>const&primitive);
 
