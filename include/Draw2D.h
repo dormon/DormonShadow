@@ -146,6 +146,8 @@ class Draw2D{
     size_t getPrimitive(size_t node,size_t i)const;
     std::shared_ptr<Primitive>getPrimitiveData(size_t primitive)const;
     void primitiveChanged(size_t primitive);
+    glm::mat3 getNodeMatrix(size_t node)const;
+    void setNodeMatrix(size_t node,glm::mat3 const&mat);
 
     size_t createLayer();
     size_t createViewport(glm::vec2 const&position,glm::vec2 const&size);

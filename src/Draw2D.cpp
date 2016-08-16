@@ -1127,6 +1127,32 @@ void Draw2D::primitiveChanged(size_t primitive){
     s.nodes.at(x)->changed = true;
 }
 
+glm::mat3 Draw2D::getNodeMatrix(size_t node)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",node);
+    return glm::mat3(1.f);
+  }
+  assert(s.nodes.at(node)!=nullptr);
+  return s.nodes.at(node)->mat;
+}
+
+void Draw2D::setNodeMatrix(size_t node,glm::mat3 const&mat){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",node);
+    return;
+  }
+  assert(s.nodes.at(node)!=nullptr);
+  s.nodes.at(node)->mat = mat;
+}
+
+
+
 size_t Draw2D::createLayer(){
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
