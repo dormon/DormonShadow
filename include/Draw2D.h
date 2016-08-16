@@ -107,7 +107,7 @@ class Spline: public Primitive{
 
 
 
-class Draw2DImpl;
+class Scene2D;
 class Draw2D{
   public:
     Draw2D(ge::gl::Context const&gl,uint32_t w,uint32_t h);
@@ -175,5 +175,5 @@ class Draw2D{
 
     void clear();
   protected:
-    Draw2DImpl*_impl;
+    Scene2D*_impl;
 };
