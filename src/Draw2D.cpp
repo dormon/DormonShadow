@@ -155,9 +155,12 @@ class Viewport{
     float cameraScale;
     float cameraAngle;
     std::vector<size_t>layers;
-    Viewport(glm::uvec2 const&size){
+    Viewport(glm::uvec2 const&size,glm::vec2 const&cameraPosition,float cameraScale,float cameraAngle){
       assert(this!=nullptr);
       this->size = size;
+      this->cameraPosition = cameraPosition;
+      this->cameraScale = cameraScale;
+      this->cameraAngle = cameraAngle;
     }
     void draw(glm::mat3 const&modelMatrix,glm::mat3 const&projectionMatrix,Scene2D const*scene){
       assert(this!=nullptr);
@@ -176,10 +179,15 @@ class Viewport{
       gl.glViewport(op.x,op.y,os.x,os.y);
       auto viewTranslate=glm::mat3(1.f);
       viewTranslate[2] = glm::vec3(-cameraPosition,1.f);
+      auto viewRotation = glm::mat3(1.f);
+      viewRotation[0].x = glm::cos(this->cameraAngle);
+      viewRotation[0].y = -glm::sin(this->cameraAngle);
+      viewRotation[1].x = glm::sin(this->cameraAngle);
+      viewRotation[1].y = glm::cos(this->cameraAngle);
       auto viewScale = glm::mat3(1.f);
       viewScale[0].x = cameraScale;
       viewScale[1].y = cameraScale;
-      glm::mat3 viewMatrix = viewScale*viewTranslate;
+      glm::mat3 viewMatrix = viewScale*viewRotation*viewTranslate;
 
       for(auto const&x:this->layers){
         auto ii = scene->layers.find(x);
@@ -451,16 +459,64 @@ void Draw2D::draw(){
   }
 }
 
-void Draw2D::setCameraScale(float cameraScale){
+glm::uvec2 Draw2D::getViewportSize()const{
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   auto*s = this->_impl;
   if(!this->hasRootViewport()){
-    ge::core::printError(GE_CORE_FCENAME,"there is no rootViewport",cameraScale);
+    ge::core::printError(GE_CORE_FCENAME,"there is no rootViewport");
+    return glm::uvec2(0);
+  }
+  assert(s->viewports.at(s->rootViewport)!=nullptr);
+  return s->viewports.at(s->rootViewport)->size;
+}
+
+glm::vec2  Draw2D::getCameraPosition()const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s = this->_impl;
+  if(!this->hasRootViewport()){
+    ge::core::printError(GE_CORE_FCENAME,"there is no rootViewport");
+    return glm::vec2(0);
+  }
+  assert(s->viewports.at(s->rootViewport)!=nullptr);
+  return s->viewports.at(s->rootViewport)->cameraPosition;
+}
+
+float      Draw2D::getCameraScale()const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s = this->_impl;
+  if(!this->hasRootViewport()){
+    ge::core::printError(GE_CORE_FCENAME,"there is no rootViewport");
+    return 1.f;
+  }
+  assert(s->viewports.at(s->rootViewport)!=nullptr);
+  return s->viewports.at(s->rootViewport)->cameraScale;
+}
+
+float      Draw2D::getCameraAngle()const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s = this->_impl;
+  if(!this->hasRootViewport()){
+    ge::core::printError(GE_CORE_FCENAME,"there is no rootViewport");
+    return 1.f;
+  }
+  assert(s->viewports.at(s->rootViewport)!=nullptr);
+  return s->viewports.at(s->rootViewport)->cameraAngle;
+}
+
+void Draw2D::setViewportSize(glm::uvec2 const&size){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s = this->_impl;
+  if(!this->hasRootViewport()){
+    ge::core::printError(GE_CORE_FCENAME,"there is no rootViewport");
     return;
   }
   assert(s->viewports.at(s->rootViewport)!=nullptr);
-  s->viewports.at(s->rootViewport)->cameraScale = cameraScale;
+  s->viewports.at(s->rootViewport)->size = size;
 }
 
 void Draw2D::setCameraPosition(glm::vec2 const&cameraPosition){
@@ -475,17 +531,32 @@ void Draw2D::setCameraPosition(glm::vec2 const&cameraPosition){
   s->viewports.at(s->rootViewport)->cameraPosition = cameraPosition;
 }
 
-void Draw2D::setViewportSize(glm::uvec2 const&size){
+void Draw2D::setCameraScale(float cameraScale){
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   auto*s = this->_impl;
   if(!this->hasRootViewport()){
-    ge::core::printError(GE_CORE_FCENAME,"there is no rootViewport");
+    ge::core::printError(GE_CORE_FCENAME,"there is no rootViewport",cameraScale);
     return;
   }
   assert(s->viewports.at(s->rootViewport)!=nullptr);
-  s->viewports.at(s->rootViewport)->size = size;
+  s->viewports.at(s->rootViewport)->cameraScale = cameraScale;
 }
+
+void Draw2D::setCameraAngle(float cameraAngle){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s = this->_impl;
+  if(!this->hasRootViewport()){
+    ge::core::printError(GE_CORE_FCENAME,"there is no rootViewport",cameraAngle);
+    return;
+  }
+  assert(s->viewports.at(s->rootViewport)!=nullptr);
+  s->viewports.at(s->rootViewport)->cameraAngle = cameraAngle;
+}
+
+
+
 
 size_t Draw2D::addLine(float ax,float ay,float bx,float by,float w,float r,float g,float b,float a){
   assert(this!=nullptr);
@@ -804,7 +875,19 @@ void Draw2D::setNodeMatrix(size_t node,glm::mat3 const&mat){
   s->nodes.at(node)->mat = mat;
 }
 
-glm::vec2 Draw2D::getViewportSize(size_t viewport)const{
+glm::uvec2 Draw2D::getViewportSize(size_t viewport)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s=this->_impl;
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport);
+    return glm::uvec2(0);
+  }
+  assert(s->viewports.at(viewport)!=nullptr);
+  return s->viewports.at(viewport)->size;
+}
+
+glm::vec2 Draw2D::getViewportCameraPosition(size_t viewport)const{
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   auto*s=this->_impl;
@@ -813,10 +896,34 @@ glm::vec2 Draw2D::getViewportSize(size_t viewport)const{
     return glm::vec2(0.f);
   }
   assert(s->viewports.at(viewport)!=nullptr);
-  return s->viewports.at(viewport)->size;
+  return s->viewports.at(viewport)->cameraPosition;
 }
 
-void Draw2D::setViewport(size_t viewport,glm::vec2 const&size){
+float Draw2D::getViewportCameraScale(size_t viewport)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s=this->_impl;
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport);
+    return 1.f;
+  }
+  assert(s->viewports.at(viewport)!=nullptr);
+  return s->viewports.at(viewport)->cameraScale;
+}
+
+float Draw2D::getViewportCameraAngle(size_t viewport)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s=this->_impl;
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport);
+    return 0.f;
+  }
+  assert(s->viewports.at(viewport)!=nullptr);
+  return s->viewports.at(viewport)->cameraAngle;
+}
+
+void Draw2D::setViewportSize(size_t viewport,glm::uvec2 const&size){
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   auto*s=this->_impl;
@@ -826,6 +933,42 @@ void Draw2D::setViewport(size_t viewport,glm::vec2 const&size){
   }
   assert(s->viewports.at(viewport)!=nullptr);
   s->viewports.at(viewport)->size = size;
+}
+
+void Draw2D::setViewportCameraPosition(size_t viewport,glm::vec2 const&cameraPosition){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s=this->_impl;
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport);
+    return;
+  }
+  assert(s->viewports.at(viewport)!=nullptr);
+  s->viewports.at(viewport)->cameraPosition = cameraPosition;
+}
+
+void Draw2D::setViewportCameraScale(size_t viewport,float cameraScale){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s=this->_impl;
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport);
+    return;
+  }
+  assert(s->viewports.at(viewport)!=nullptr);
+  s->viewports.at(viewport)->cameraScale = cameraScale;
+}
+
+void Draw2D::setViewportCameraAngle(size_t viewport,float cameraAngle){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s=this->_impl;
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport);
+    return;
+  }
+  assert(s->viewports.at(viewport)!=nullptr);
+  s->viewports.at(viewport)->cameraAngle = cameraAngle;
 }
 
 
@@ -839,12 +982,12 @@ size_t Draw2D::createLayer(){
   return s->layerCounter++;
 }
 
-size_t Draw2D::createViewport(glm::uvec2 const&size){
+size_t Draw2D::createViewport(glm::uvec2 const&size,glm::vec2 const&cameraPosition,float cameraScale,float cameraAngle){
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
   auto*s=this->_impl;
   while(this->isViewport(s->viewportCounter))s->viewportCounter++;
-  s->viewports[s->viewportCounter] = std::make_shared<Viewport>(size);
+  s->viewports[s->viewportCounter] = std::make_shared<Viewport>(size,cameraPosition,cameraScale,cameraAngle);
   return s->viewportCounter++;
 }
 
