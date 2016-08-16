@@ -2,6 +2,7 @@
 #include<Draw2DShaders.h>
 #include<geCore/ErrorPrinter.h>
 #include<Font.h>
+#include<algorithm>
 
 using namespace ge::gl;
 
@@ -41,10 +42,82 @@ class Scene2D{
     std::map<size_t,std::shared_ptr<Layer>>layers;
     std::map<size_t,std::shared_ptr<Node>>nodes;
     std::map<size_t,std::shared_ptr<Primitive>>primitives;
+    size_t viewportCounter = 0;
+    size_t layerCounter = 0;
+    size_t nodeCounter = 0;
+    size_t primitiveCounter = 0;
     std::map<size_t,std::set<size_t>>viewportParents;
     std::map<size_t,std::set<size_t>>layerParents;
     std::map<size_t,std::set<size_t>>nodeParentNodes;
     std::map<size_t,std::set<size_t>>nodeParentLayers;
+    std::map<size_t,std::set<size_t>>primitiveParents;
+    void addViewportParent(size_t viewport,size_t node){
+      assert(this!=nullptr);
+      if(this->viewportParents.count(viewport)==0)
+        this->viewportParents[viewport] = std::set<size_t>();
+      this->viewportParents.at(viewport).insert(node);
+    }
+    void removeViewportParent(size_t viewport,size_t node){
+      assert(this!=nullptr);
+      if(this->viewportParents.count(viewport)==0)return;
+      this->viewportParents.at(viewport).erase(node);
+      if(this->viewportParents.at(viewport).size()==0)
+        this->viewportParents.erase(viewport);
+    }
+    void addLayerParent(size_t layer,size_t viewport){
+      assert(this!=nullptr);
+      if(this->layerParents.count(layer)==0)
+        this->layerParents[layer] = std::set<size_t>();
+      this->layerParents.at(layer).insert(viewport);
+    }
+    void removeLayerParent(size_t layer,size_t viewport){
+      assert(this!=nullptr);
+      if(this->layerParents.count(layer)==0)return;
+      this->layerParents.at(layer).erase(viewport);
+      if(this->layerParents.at(layer).size()==0)
+        this->layerParents.erase(layer);
+    }
+    void addNodeParentNode(size_t node,size_t parentNode){
+      assert(this!=nullptr);
+      if(this->nodeParentNodes.count(node)==0)
+        this->nodeParentNodes[node] = std::set<size_t>();
+      this->nodeParentNodes.at(node).insert(parentNode);
+    }
+    void removeNodeParentNode(size_t node,size_t parentNode){
+      assert(this!=nullptr);
+      if(this->nodeParentNodes.count(node)==0)return;
+      this->nodeParentNodes.at(node).erase(parentNode);
+      if(this->nodeParentNodes.at(node).size()==0)
+        this->nodeParentNodes.erase(node);
+    }
+    void addNodeParentLayer(size_t node,size_t layer){
+      assert(this!=nullptr);
+      if(this->nodeParentLayers.count(node)==0)
+        this->nodeParentLayers[node] = std::set<size_t>();
+      this->nodeParentLayers.at(node).insert(layer);
+    }
+    void removeNodeParentLayer(size_t node,size_t layer){
+      assert(this!=nullptr);
+      if(this->nodeParentLayers.count(node)==0)return;
+      this->nodeParentLayers.at(node).erase(layer);
+      if(this->nodeParentLayers.at(node).size()==0)
+        this->nodeParentLayers.erase(node);
+    }
+    void addPrimitiveParent(size_t primitive,size_t node){
+      assert(this!=nullptr);
+      if(this->primitiveParents.count(primitive)==0)
+        this->primitiveParents[primitive] = std::set<size_t>();
+      this->primitiveParents.at(primitive).insert(node);
+    }
+    void removePrimitiveParent(size_t primitive,size_t node){
+      assert(this!=nullptr);
+      if(this->primitiveParents.count(primitive)==0)return;
+      this->primitiveParents.at(primitive).erase(node);
+      if(this->primitiveParents.at(primitive).size()==0)
+        this->primitiveParents.erase(primitive);
+    }
+
+    size_t rootViewport = -1;
     Scene2D(Context const&g):gl(g){
       assert(this!=nullptr);
       this->lineProgram = std::make_shared<Program>();
@@ -90,9 +163,9 @@ class Scene2D{
 class Node{
   public:
     glm::mat3 mat;
-    std::vector<std::shared_ptr<Node>>childs;
-    std::map<size_t,std::shared_ptr<Primitive>>primitives;
-    std::map<size_t,std::shared_ptr<Viewport>>viewports;
+    std::vector<size_t>childs;
+    std::vector<size_t>primitives;
+    std::vector<size_t>viewports;
     std::shared_ptr<Buffer>lineBuffer;
     std::shared_ptr<VertexArray>lineVAO;
     size_t nofLines;
@@ -113,8 +186,8 @@ class Node{
     size_t nofCharacters;
     bool changed = true;
     void draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D const&scene);
-    Node(){
-      this->mat = glm::mat3(1.f);
+    Node(glm::mat3 const&mat = glm::mat3(1.f)){
+      this->mat = mat;
     }
 };
 
@@ -122,9 +195,11 @@ class Layer{
   public:
     Layer(){}
     ~Layer(){}
-    std::shared_ptr<Node>root;
+    size_t root;
     void draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D const&scene){
-      if(root)root->draw(modelMatrix,viewMatrix,scene);
+      auto ii = scene.nodes.find(root);
+      if(ii==scene.nodes.end())return;
+      ii->second->draw(modelMatrix,viewMatrix,scene);
     }
 };
 
@@ -132,8 +207,14 @@ class Viewport{
   public:
     glm::vec2 position;
     glm::vec2 size;
-    std::vector<std::shared_ptr<Layer>>layers;
+    std::vector<size_t>layers;
+    Viewport(glm::vec2 const&position,glm::vec2 const&size){
+      assert(this!=nullptr);
+      this->position = position;
+      this->size = size;
+    }
     void draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D const&scene){
+      assert(this!=nullptr);
       auto const&gl = scene.gl;
       glm::vec3 wp[4];
       wp[0]=modelMatrix*glm::vec3(position,1.f);
@@ -147,8 +228,11 @@ class Viewport{
           glm::max(glm::max(wp[0].x,wp[1].x),glm::max(wp[2].x,wp[3].x)),
           glm::max(glm::max(wp[0].y,wp[1].y),glm::max(wp[2].y,wp[3].y)))-op;
       gl.glViewport(op.x,op.y,os.x,os.y);
-      for(auto const&x:this->layers)
-        x->draw(modelMatrix,viewMatrix,scene);
+      for(auto const&x:this->layers){
+        auto ii = scene.layers.find(x);
+        assert(ii!=scene.layers.end());
+        ii->second->draw(modelMatrix,viewMatrix,scene);
+      }
       /*
          gl.glEnable(GL_STENCIL_TEST);
          gl.glStencilFunc(GL_ALWAYS,0,0);
@@ -173,9 +257,12 @@ void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D c
     std::vector<float>triangleData;
     std::vector<float>splineData;
     std::vector<float>textData;
-    for(auto const&x:this->primitives){
-      if(x.second->type == Primitive::LINE){
-        auto l = std::dynamic_pointer_cast<Line>(x.second);
+    for(auto const&xx:this->primitives){
+      auto ii = scene.primitives.find(xx);
+      assert(ii != scene.primitives.end());
+      auto x = ii->second;
+      if(x->type == Primitive::LINE){
+        auto l = std::dynamic_pointer_cast<Line>(x);
         lineData.push_back(l->color[0]);
         lineData.push_back(l->color[1]);
         lineData.push_back(l->color[2]);
@@ -186,8 +273,8 @@ void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D c
         lineData.push_back(l->points[1].y);
         lineData.push_back(l->width);
       }
-      if(x.second->type == Primitive::POINT){
-        auto l = std::dynamic_pointer_cast<Point>(x.second);
+      if(x->type == Primitive::POINT){
+        auto l = std::dynamic_pointer_cast<Point>(x);
         pointData.push_back(l->color[0]);
         pointData.push_back(l->color[1]);
         pointData.push_back(l->color[2]);
@@ -196,8 +283,8 @@ void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D c
         pointData.push_back(l->point.y);
         pointData.push_back(l->size);
       }
-      if(x.second->type == Primitive::CIRCLE){
-        auto l = std::dynamic_pointer_cast<Circle>(x.second);
+      if(x->type == Primitive::CIRCLE){
+        auto l = std::dynamic_pointer_cast<Circle>(x);
         circleData.push_back(l->color[0]);
         circleData.push_back(l->color[1]);
         circleData.push_back(l->color[2]);
@@ -207,8 +294,8 @@ void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D c
         circleData.push_back(l->size);
         circleData.push_back(l->width);
       }
-      if(x.second->type == Primitive::TRIANGLE){
-        auto l = std::dynamic_pointer_cast<Triangle>(x.second);
+      if(x->type == Primitive::TRIANGLE){
+        auto l = std::dynamic_pointer_cast<Triangle>(x);
         for(size_t i=0;i<3;++i){
           triangleData.push_back(l->color[0]);
           triangleData.push_back(l->color[1]);
@@ -218,8 +305,8 @@ void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D c
           triangleData.push_back(l->points[i].y);
         }
       }
-      if(x.second->type == Primitive::SPLINE){
-        auto l = std::dynamic_pointer_cast<Spline>(x.second);
+      if(x->type == Primitive::SPLINE){
+        auto l = std::dynamic_pointer_cast<Spline>(x);
         splineData.push_back(l->color[0]);
         splineData.push_back(l->color[1]);
         splineData.push_back(l->color[2]);
@@ -230,8 +317,8 @@ void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D c
         }
         splineData.push_back(l->width);
       }
-      if(x.second->type == Primitive::TEXT){
-        auto l = std::dynamic_pointer_cast<Text>(x.second);
+      if(x->type == Primitive::TEXT){
+        auto l = std::dynamic_pointer_cast<Text>(x);
         int32_t c=0;
         for(auto const&x:l->data){
           textData.push_back(l->color[0]);
@@ -368,8 +455,11 @@ void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&viewMatrix,Scene2D c
   scene.gl.glDisable(GL_BLEND);
   this->textVAO->unbind();
 
-  for(auto const&x:this->viewports)
-    x.second->draw(newModelMatrix,viewMatrix,scene);
+  for(auto const&x:this->viewports){
+    auto ii = scene.viewports.find(x);
+    assert(ii!=scene.viewports.end());
+    ii->second->draw(newModelMatrix,viewMatrix,scene);
+  }
 }
 
 
@@ -392,11 +482,6 @@ class Draw2DImpl{
       assert(this!=nullptr);
       this->viewport.w = w;
       this->viewport.h = h;
-      this->base = std::make_shared<Viewport>();
-      this->base->position = glm::vec2(0.f);
-      this->base->size = glm::vec2(w,h);
-      this->base->layers.push_back(std::make_shared<Layer>());
-      this->base->layers.at(0)->root = std::make_shared<Node>();
     }
     ~Draw2DImpl(){
     }
@@ -468,6 +553,13 @@ Draw2D::Draw2D(Context const&gl,uint32_t w,uint32_t h){
       {std::make_shared<Shader>(GL_VERTEX_SHADER,textVS),
       std::make_shared<Shader>(GL_GEOMETRY_SHADER,textGS),
       std::make_shared<Shader>(GL_FRAGMENT_SHADER,textFS)});
+
+  auto vv=this->createViewport(glm::vec2(0.f),glm::vec2(w,h));
+  auto ll=this->createLayer();
+  auto nn=this->createNode();
+  this->insertLayer(vv,ll);
+  this->setLayerNode(ll,nn);
+  this->setRootViewport(vv);
 }
 
 Draw2D::~Draw2D(){
@@ -502,7 +594,9 @@ void Draw2D::draw(){
   glm::mat3 modelMatrix = translate;
   glm::mat3 matrix = viewMatrix*modelMatrix;
 
-  this->_impl->base->draw(glm::mat3(1.f),viewMatrix,this->_impl->scene);
+  if(this->_impl->scene.viewports.count(this->_impl->scene.rootViewport)!=0){
+    this->_impl->scene.viewports.at(this->_impl->scene.rootViewport)->draw(glm::mat3(1.f),viewMatrix,this->_impl->scene);
+  }
 
   if(!this->_impl->convertedForDrawing){
     std::vector<float>lineData;
@@ -734,9 +828,8 @@ size_t Draw2D::addLine(float ax,float ay,float bx,float by,float w,float r,float
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
   this->_impl->primitives[id] = std::make_shared<Line>(glm::vec2(ax,ay),glm::vec2(bx,by),w);
-  this->_impl->base->layers.at(0)->root->primitives[id] = std::make_shared<Line>(glm::vec2(ax,ay),glm::vec2(bx,by),w);
-  this->_impl->base->layers.at(0)->root->primitives[id]->color = glm::vec4(r,g,b,a);
   this->setColor(id,r,g,b,a);
+  this->insertPrimitive(0,this->createPrimitive(this->_impl->primitives[id]));
   return id;
 }
 
@@ -745,9 +838,8 @@ size_t Draw2D::addPoint(float x,float y,float rd,float r,float g,float b,float a
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
   this->_impl->primitives[id] = std::make_shared<Point>(glm::vec2(x,y),rd);
-  this->_impl->base->layers.at(0)->root->primitives[id] = std::make_shared<Point>(glm::vec2(x,y),rd);
-  this->_impl->base->layers.at(0)->root->primitives[id]->color = glm::vec4(r,g,b,a);
   this->setColor(id,r,g,b,a);
+  this->insertPrimitive(0,this->createPrimitive(this->_impl->primitives[id]));
   return id;
 }
 
@@ -756,9 +848,8 @@ size_t Draw2D::addCircle(float x,float y,float rd,float w,float r,float g,float 
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
   this->_impl->primitives[id] = std::make_shared<Circle>(glm::vec2(x,y),rd,w);
-  this->_impl->base->layers.at(0)->root->primitives[id] = std::make_shared<Circle>(glm::vec2(x,y),rd,w);
-  this->_impl->base->layers.at(0)->root->primitives[id]->color = glm::vec4(r,g,b,a);
   this->setColor(id,r,g,b,a);
+  this->insertPrimitive(0,this->createPrimitive(this->_impl->primitives[id]));
   return id;
 }
 
@@ -767,9 +858,8 @@ size_t Draw2D::addTriangle(float ax,float ay,float bx,float by,float cx,float cy
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
   this->_impl->primitives[id] = std::make_shared<Triangle>(glm::vec2(ax,ay),glm::vec2(bx,by),glm::vec2(cx,cy));
-  this->_impl->base->layers.at(0)->root->primitives[id] = std::make_shared<Triangle>(glm::vec2(ax,ay),glm::vec2(bx,by),glm::vec2(cx,cy));
-  this->_impl->base->layers.at(0)->root->primitives[id]->color = glm::vec4(r,g,b,a);
   this->setColor(id,r,g,b,a);
+  this->insertPrimitive(0,this->createPrimitive(this->_impl->primitives[id]));
   return id;
 }
 
@@ -778,9 +868,8 @@ size_t Draw2D::addText(std::string const&data,float size,float x,float y,float v
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
   this->_impl->primitives[id] = std::make_shared<Text>(data,size,glm::vec2(x,y),glm::vec2(vx,vy));
-  this->_impl->base->layers.at(0)->root->primitives[id] = std::make_shared<Text>(data,size,glm::vec2(x,y),glm::vec2(vx,vy));
-  this->_impl->base->layers.at(0)->root->primitives[id]->color = glm::vec4(r,g,b,a);
   this->setColor(id,r,g,b,a);
+  this->insertPrimitive(0,this->createPrimitive(this->_impl->primitives[id]));
   return id;
 }
 
@@ -789,9 +878,8 @@ size_t Draw2D::addSpline(float ax,float ay,float bx,float by,float cx,float cy,f
   assert(this->_impl!=nullptr);
   size_t id=this->_impl->primitives.size();
   this->_impl->primitives[id] = std::make_shared<Spline>(glm::vec2(ax,ay),glm::vec2(bx,by),glm::vec2(cx,cy),glm::vec2(dx,dy),width);
-  this->_impl->base->layers.at(0)->root->primitives[id] = std::make_shared<Spline>(glm::vec2(ax,ay),glm::vec2(bx,by),glm::vec2(cx,cy),glm::vec2(dx,dy),width);
-  this->_impl->base->layers.at(0)->root->primitives[id]->color = glm::vec4(r,g,b,a);
   this->setColor(id,r,g,b,a);
+  this->insertPrimitive(0,this->createPrimitive(this->_impl->primitives[id]));
   return id;
 }
 
@@ -813,3 +901,525 @@ void Draw2D::clear(){
   assert(this->_impl!=nullptr);
   this->_impl->primitives.clear();
 }
+
+bool Draw2D::isViewport(size_t viewport)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  return s.viewports.count(viewport)!=0;
+}
+
+bool Draw2D::isLayer(size_t layer)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  return s.layers.count(layer)!=0;
+}
+
+bool Draw2D::isNode(size_t node)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  return s.nodes.count(node)!=0;
+}
+
+bool Draw2D::isPrimitive(size_t primitive)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  return s.primitives.count(primitive)!=0;
+}
+
+size_t Draw2D::getRootViewport()const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  if(!this->isViewport(this->_impl->scene.rootViewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no root viewport");
+    return 0;
+  }
+  return this->_impl->scene.rootViewport;
+}
+
+void Draw2D::setRootViewport(size_t viewport){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport);
+    return;
+  }
+  this->_impl->scene.rootViewport = viewport;
+}
+
+bool Draw2D::hasRootViewport()const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  return this->isViewport(this->_impl->scene.rootViewport);
+}
+
+size_t Draw2D::getNofLayers(size_t viewport)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport);
+    return 0;
+  }
+  auto ii = s.viewports.find(viewport);
+  assert(ii->second!=nullptr);
+  return ii->second->layers.size();
+}
+
+size_t Draw2D::getLayer(size_t viewport,size_t i)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport,i);
+    return 0;
+  }
+  auto ii = s.viewports.find(viewport);
+  assert(ii->second!=nullptr);
+  if(i>=ii->second->layers.size()){
+    ge::core::printError(GE_CORE_FCENAME,"index out of range",viewport,i);
+    return 0;
+  }
+  return ii->second->layers.at(i);
+}
+
+size_t Draw2D::getNofNodes(size_t node)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",node);
+    return 0;
+  }
+  auto ii = s.nodes.find(node);
+  assert(ii->second!=nullptr);
+  return ii->second->childs.size();
+}
+
+size_t Draw2D::getNode(size_t node,size_t i)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",node,i);
+    return 0;
+  }
+  auto ii = s.nodes.find(node);
+  assert(ii->second!=nullptr);
+  if(i>=ii->second->childs.size()){
+    ge::core::printError(GE_CORE_FCENAME,"index out of range",node,i);
+    return 0;
+  }
+  return ii->second->childs.at(i);
+}
+
+size_t Draw2D::getNode(size_t layer)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  if(!this->hasNode(layer)){
+    ge::core::printError(GE_CORE_FCENAME,"that layer does not have node",layer);
+    return 0;
+  }
+  assert(s.layers.find(layer)!=s.layers.end());
+  assert(s.layers.find(layer)->second!=nullptr);
+  return s.layers.find(layer)->second->root;
+}
+
+bool   Draw2D::hasNode(size_t layer)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  if(!this->isLayer(layer)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such layer",layer);
+    return false;
+  }
+  auto ii = s.layers.find(layer);
+  assert(ii->second!=nullptr);
+  return this->isNode(ii->second->root);
+}
+
+size_t Draw2D::getNofViewports(size_t node)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",node);
+    return 0;
+  }
+  auto ii = s.nodes.find(node);
+  assert(ii->second!=nullptr);
+  return ii->second->viewports.size();
+}
+
+size_t Draw2D::getViewport(size_t node,size_t i)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",node,i);
+    return 0;
+  }
+  auto ii = s.nodes.find(node);
+  assert(ii->second!=nullptr);
+  if(i>=ii->second->viewports.size()){
+    ge::core::printError(GE_CORE_FCENAME,"index out of range",node,i);
+    return 0;
+  }
+  return ii->second->viewports.at(i);
+}
+
+size_t Draw2D::getNofPrimitives(size_t node)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",node);
+    return 0;
+  }
+  auto ii = s.nodes.find(node);
+  assert(ii->second!=nullptr);
+  return ii->second->primitives.size();
+}
+
+size_t Draw2D::getPrimitive(size_t node,size_t i)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",node,i);
+    return 0;
+  }
+  auto ii = s.nodes.find(node);
+  assert(ii->second!=nullptr);
+  if(i>=ii->second->primitives.size()){
+    ge::core::printError(GE_CORE_FCENAME,"index out of range",node,i);
+    return 0;
+  }
+  return ii->second->primitives.at(i);
+}
+
+std::shared_ptr<Primitive>Draw2D::getPrimitiveData(size_t primitive)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto const&s=this->_impl->scene;
+  if(!this->isPrimitive(primitive)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such primitive",primitive);
+    return nullptr;
+  }
+  return s.primitives.at(primitive);
+}
+
+
+void Draw2D::primitiveChanged(size_t primitive){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isPrimitive(primitive)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such primitive",primitive);
+    return;
+  }
+  if(s.primitiveParents.count(primitive)==0)return;
+  for(auto const&x:s.primitiveParents.at(primitive))
+    s.nodes.at(x)->changed = true;
+}
+
+size_t Draw2D::createLayer(){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  while(this->isLayer(s.layerCounter))s.layerCounter++;
+  s.layers[s.layerCounter] = std::make_shared<Layer>();
+  return s.layerCounter++;
+}
+
+size_t Draw2D::createViewport(glm::vec2 const&position,glm::vec2 const&size){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  while(this->isViewport(s.viewportCounter))s.viewportCounter++;
+  s.viewports[s.viewportCounter] = std::make_shared<Viewport>(position,size);
+  return s.viewportCounter++;
+}
+
+size_t Draw2D::createNode(glm::mat3 const&mat){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  while(this->isNode(s.nodeCounter))s.nodeCounter++;
+  s.nodes[s.nodeCounter] = std::make_shared<Node>(mat);
+  return s.nodeCounter++;
+}
+
+size_t Draw2D::createPrimitive(std::shared_ptr<Primitive>const&primitive){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  while(this->isPrimitive(s.primitiveCounter))s.primitiveCounter++;
+  s.primitives[s.primitiveCounter] = primitive;
+  return s.primitiveCounter++;
+}
+
+void Draw2D::insertLayer(size_t viewport,size_t layer){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport,layer);
+    return;
+  }
+  if(!this->isLayer(layer)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such layer",viewport,layer);
+    return;
+  }
+  assert(s.viewports.at(viewport)!=nullptr);
+  auto&layers=s.viewports.at(viewport)->layers;
+  if(std::find(layers.begin(),layers.end(),layer)!=layers.end())return;
+  layers.push_back(layer);
+
+  s.addLayerParent(layer,viewport);
+}
+
+void Draw2D::insertViewport(size_t node,size_t viewport){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",viewport,node);
+    return;
+  }
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport,node);
+    return;
+  }
+
+  assert(s.nodes.at(node)!=nullptr);
+  auto&viewports=s.nodes.at(node)->viewports;
+  if(std::find(viewports.begin(),viewports.end(),viewport)!=viewports.end())return;
+  viewports.push_back(viewport);
+
+  s.addViewportParent(viewport,node);
+}
+
+void Draw2D::insertNode(size_t toNode,size_t node){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isNode(toNode)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such toNode",toNode,node);
+    return;
+  }
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",toNode,node);
+    return;
+  }
+
+  assert(s.nodes.at(toNode)!=nullptr);
+  auto&nodes=s.nodes.at(toNode)->childs;
+  if(std::find(nodes.begin(),nodes.end(),node)!=nodes.end())return;
+  nodes.push_back(node);
+
+  s.addNodeParentNode(node,toNode);
+}
+
+void Draw2D::setLayerNode(size_t layer,size_t node){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isLayer(layer)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such layer",layer,node);
+    return;
+  }
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",layer,node);
+    return;
+  }
+  assert(s.layers.at(layer)!=nullptr);
+  s.layers.at(layer)->root = node;
+
+  s.addNodeParentLayer(node,layer);
+}
+
+void Draw2D::insertPrimitive(size_t node,size_t primitive){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",node,primitive);
+    return;
+  }
+  if(!this->isPrimitive(primitive)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such primitive",node,primitive);
+    return;
+  }
+
+  assert(s.nodes.at(node)!=nullptr);
+  auto&primitives=s.nodes.at(node)->primitives;
+  if(std::find(primitives.begin(),primitives.end(),primitive)!=primitives.end())return;
+  primitives.push_back(primitive);
+
+  s.addPrimitiveParent(primitive,node);
+  s.nodes.at(node)->changed = true;
+}
+
+void Draw2D::eraseLayer(size_t viewport,size_t layer){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport,layer);
+    return;
+  }
+  if(!this->isLayer(layer)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such layer",viewport,layer);
+    return;
+  }
+  assert(s.viewports.at(viewport)!=nullptr);
+  auto&layers=s.viewports.at(viewport)->layers;
+  layers.erase(std::remove(layers.begin(),layers.end(),layer),layers.end());
+
+  s.removeLayerParent(layer,viewport);
+}
+
+void Draw2D::eraseViewport(size_t node,size_t viewport){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",viewport,node);
+    return;
+  }
+  if(!this->isViewport(viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport,node);
+    return;
+  }
+
+  assert(s.nodes.at(node)!=nullptr);
+  auto&viewports=s.nodes.at(node)->viewports;
+  viewports.erase(std::remove(viewports.begin(),viewports.end(),viewport),viewports.end());
+
+  s.removeViewportParent(viewport,node);
+}
+
+void Draw2D::eraseNode(size_t fromNode,size_t node){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isNode(fromNode)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such fromNode",fromNode,node);
+    return;
+  }
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",fromNode,node);
+    return;
+  }
+
+  assert(s.nodes.at(fromNode)!=nullptr);
+  auto&nodes=s.nodes.at(fromNode)->childs;
+  nodes.erase(std::remove(nodes.begin(),nodes.end(),node),nodes.end());
+
+  s.removeNodeParentNode(node,fromNode);
+}
+
+void Draw2D::eraseNode(size_t layer){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isLayer(layer)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such layer",layer);
+    return;
+  }
+  assert(s.layers.at(layer)!=nullptr);
+  auto&node = s.layers.at(layer)->root;
+  s.removeNodeParentLayer(layer,node);
+  node = -1;
+}
+
+void Draw2D::erasePrimitive(size_t node,size_t primitive){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",node,primitive);
+    return;
+  }
+  if(!this->isPrimitive(primitive)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such primitive",node,primitive);
+    return;
+  }
+
+  assert(s.nodes.at(node)!=nullptr);
+  auto&primitives=s.nodes.at(node)->primitives;
+  primitives.erase(std::remove(primitives.begin(),primitives.end(),primitive),primitives.end());
+
+  s.removePrimitiveParent(primitive,node);
+  s.nodes.at(node)->changed = true;
+}
+
+void Draw2D::deleteLayer(size_t layer){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isLayer(layer))return;
+  if(s.layerParents.count(layer)!=0)
+    for(auto const&x:s.layerParents.at(layer))
+      this->eraseLayer(x,layer);
+  if(this->hasNode(layer))
+    s.removeNodeParentLayer(this->getNode(layer),layer);
+  s.layerParents.erase(layer);
+  s.layers.erase(layer);
+}
+
+void Draw2D::deleteViewport(size_t viewport){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isViewport(viewport))return;
+  if(s.viewportParents.count(viewport)!=0)
+    for(auto const&x:s.layerParents.at(viewport))
+      this->eraseViewport(x,viewport);
+  for(auto const&x:s.viewports.at(viewport)->layers)
+    s.removeLayerParent(x,viewport);
+  s.viewportParents.erase(viewport);
+  s.viewports.erase(viewport);
+}
+
+void Draw2D::deleteNode(size_t node){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isNode(node))return;
+  if(s.nodeParentNodes.count(node)!=0)
+    for(auto const&x:s.nodeParentNodes.at(node))
+      this->eraseNode(x,node);
+  if(s.nodeParentLayers.count(node)!=0)
+    for(auto const&x:s.nodeParentLayers.at(node))
+      this->eraseNode(x);
+  for(auto const&x:s.nodes.at(node)->childs)
+    s.removeNodeParentNode(x,node);
+  for(auto const&x:s.nodes.at(node)->viewports)
+    s.removeViewportParent(x,node);
+  for(auto const&x:s.nodes.at(node)->primitives)
+    s.removePrimitiveParent(x,node);
+
+  s.nodeParentNodes.erase(node);
+  s.nodeParentLayers.erase(node);
+  s.nodes.erase(node);
+}
+
+void Draw2D::deletePrimitive(size_t primitive){
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto&s=this->_impl->scene;
+  if(!this->isPrimitive(primitive))return;
+  if(s.primitiveParents.count(primitive)!=0)
+    for(auto const&x:s.primitiveParents.at(primitive))
+      this->erasePrimitive(x,primitive);
+
+  s.primitiveParents.erase(primitive);
+  s.primitives.erase(primitive);
+}
+
