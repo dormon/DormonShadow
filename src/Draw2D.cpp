@@ -444,10 +444,7 @@ void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&projectionMatrix,Sce
   scene->textProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   this->textVAO->bind();
   scene->fontTexture->bind(0);
-  scene->gl.glEnable(GL_BLEND);
-  scene->gl.glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
   scene->gl.glDrawArrays(GL_POINTS,0,this->nofCharacters);
-  scene->gl.glDisable(GL_BLEND);
   this->textVAO->unbind();
 
   for(auto const&x:this->viewports){
@@ -455,6 +452,13 @@ void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&projectionMatrix,Sce
     assert(ii!=scene->viewports.end());
     ii->second->draw(newModelMatrix,projectionMatrix,scene);
   }
+
+  for(auto const&x:this->childs){
+    auto ii = scene->nodes.find(x);
+    assert(ii!=scene->nodes.end());
+    ii->second->draw(newModelMatrix,projectionMatrix,scene);
+  }
+  
 }
 
 bool Scene2D::isUpCircularViewportInNode(size_t up,size_t down)const{
@@ -594,9 +598,11 @@ void Draw2D::draw(){
   assert(this->_impl!=nullptr);
   auto const&gl=this->_impl->gl;
   auto*s = this->_impl;
-  gl.glClearColor(0,0,0,0);
+  gl.glClearColor(0,0,0,1);
   gl.glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
   gl.glEnable(GL_STENCIL_TEST);
+  gl.glEnable(GL_BLEND);
+  gl.glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 
   if(s->viewports.count(s->rootViewport)!=0){
     auto&v=s->viewports.at(s->rootViewport);
@@ -606,6 +612,9 @@ void Draw2D::draw(){
     viewProjection[2] = glm::vec3(-1,-1,1);
     v->draw(glm::mat3(1.f),viewProjection,s);
   }
+
+  gl.glDisable(GL_BLEND);
+  gl.glDisable(GL_STENCIL_TEST);
 }
 
 glm::uvec2 Draw2D::getViewportSize()const{

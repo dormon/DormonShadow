@@ -192,20 +192,32 @@ bool Application::init(int argc,char*argv[]){
   this->draw2D = std::make_shared<Draw2D>(*this->gl);
   auto vv=this->draw2D->createViewport(glm::uvec2(this->window->getWidth(),this->window->getHeight()));
   auto ll=this->draw2D->createLayer();
-  auto nn=this->draw2D->createNode();
+  auto nn=this->draw2D->createNode(Draw2D::translate(glm::vec2(100,100)));
+  auto nn2 =this->draw2D->createNode(Draw2D::translate(glm::vec2(300,300)));
+  auto nn3 = this->draw2D->createNode(Draw2D::translate(glm::vec2(100,100)));
+  this->draw2D->insertNode(nn2,nn);
+  this->draw2D->insertNode(nn3,nn);
+  this->draw2D->insertNode(nn2,nn3);
+  //auto ll2=this->draw2D->createLayer();
   this->draw2D->insertLayer(vv,ll);
-  this->draw2D->setLayerNode(ll,nn);
+  this->draw2D->setLayerNode(ll,nn2);
   this->draw2D->setRootViewport(vv);
-  this->draw2D->insertViewport(nn,vv);
+  //this->draw2D->insertNode(nn2,nn);
+  //this->draw2D->setLayerNode(ll2,nn2);
+  //this->draw2D->insertLayer(vv,ll2);
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(0,0),glm::vec2(100,100),1,glm::vec4(0,1,0,1))));
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(100,100),glm::vec2(-100,300),2,glm::vec4(1,1,0,1))));
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Point>(glm::vec2(-30,-50),10,glm::vec4(0,1,1,1))));
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Point>(glm::vec2(300,-40),1,glm::vec4(1,0,0,1))));
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Circle>(glm::vec2(-200,40),40,2,glm::vec4(1,0,0,1))));
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Circle>(glm::vec2(0,0),20,4,glm::vec4(1,1,1,1))));
-  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Triangle>(glm::vec2(-12,32),glm::vec2(120,33),glm::vec2(-66,-66),glm::vec4(0,.5,0,1))));
+  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Triangle>(glm::vec2(-12,32),glm::vec2(120,33),glm::vec2(-66,-66),glm::vec4(0,.5,0,.5))));
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Spline>(glm::vec2(0,0),glm::vec2(100,100),glm::vec2(-100,100),glm::vec2(-200,-300),1,glm::vec4(1,0,0,1))));
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Text>("int main(int argc,char*argv[]){return EXIT_SUCCESS;}",8,glm::vec2(-50,-20),glm::vec2(2,1),glm::vec4(1,1,1,1))));
+
+  this->testFce = new gde::Function(this->draw2D,"add",{"valueA","valueB"},"output");
+  this->testFce->create();
+  this->draw2D->insertNode(nn2,this->testFce->node);
 
   kernel.typeRegister->addType<float*>();
   kernel.addAtomicType(
@@ -502,5 +514,6 @@ bool Application::resize(SDL_Event const&event,void*d){
 
 Application::~Application(){
   this->variableManipulator = nullptr;
+  delete this->testFce;
   TwTerminate();
 }

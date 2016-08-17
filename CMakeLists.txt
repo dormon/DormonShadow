@@ -11,6 +11,7 @@ set(INCLUDES
   include/Font.h
   include/Draw2D.h
   include/Draw2DShaders.h
+  include/GEDEEditor.h
   )
 
 set(SOURCES
@@ -20,6 +21,7 @@ set(SOURCES
   src/RegisterMouse.cpp
   src/Functions.cpp
   src/Draw2D.cpp
+  src/GEDEEditor.cpp
   )
 
 include_directories(include /usr/local/include)
