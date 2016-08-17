@@ -63,6 +63,17 @@ class Scene2D{
       if(parents.at(child).size()==0)
         parents.erase(child);
     }
+    bool isUpCircularViewportInNode(size_t up,size_t down)const;
+    bool isUpCircularLayerInViewport(size_t up,size_t down)const;
+    bool isUpCircularLayerInNode(size_t up,size_t down)const;
+    bool isUpCircularNodeInLayer(size_t up,size_t down)const;
+    bool isUpCircularNodeInNode(size_t up,size_t down)const;
+    bool isDownCircularViewportInNode(size_t up,size_t down)const;
+    bool isDownCircularLayerInViewport(size_t up,size_t down)const;
+    bool isDownCircularNodeInViewport(size_t up,size_t down)const;
+    bool isDownCircularNodeInLayer(size_t up,size_t down)const;
+    bool isDownCircularNodeInNode(size_t up,size_t down)const;
+
     Scene2D(Context const&g):gl(g){
       assert(this!=nullptr);
       this->lineProgram = std::make_shared<Program>();
@@ -423,6 +434,127 @@ void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&projectionMatrix,Sce
   }
 }
 
+bool Scene2D::isUpCircularViewportInNode(size_t up,size_t down)const{
+  if(this->nodeParentNodes.count(up)!=0)
+    for(auto const&x:this->nodeParentNodes.at(up))
+      if(this->isUpCircularViewportInNode(x,down))return true;
+  if(this->nodeParentLayers.count(up)==0)return false;
+  for(auto const&x:this->nodeParentLayers.at(up)){
+    if(this->layerParents.count(x)==0)continue;
+    for(auto const&y:this->layerParents.at(x))
+      if(y==down)return true;
+  }
+  return false;
+}
+
+bool Scene2D::isUpCircularLayerInViewport(size_t up,size_t down)const{
+  if(this->viewportParents.count(up)==0)return false;
+  for(auto const&x:this->viewportParents.at(up))
+    if(this->isUpCircularLayerInNode(x,down))return true;
+  return false;
+}
+
+bool Scene2D::isUpCircularLayerInNode(size_t up,size_t down)const{
+  if(this->nodeParentNodes.count(up)!=0)
+    for(auto const&x:this->nodeParentNodes.at(up))
+      if(this->isUpCircularLayerInNode(x,down))return true;
+  if(this->nodeParentLayers.count(up)==0)return false;
+  for(auto const&x:this->nodeParentLayers.at(up))
+    if(x==down)return true;
+  return false;
+}
+
+
+bool Scene2D::isUpCircularNodeInLayer(size_t up,size_t down)const{
+  if(this->layerParents.count(up)==0)return false;
+  for(auto const&x:this->layerParents.at(up)){
+    if(this->viewportParents.count(x)==0)continue;
+    for(auto const&y:this->viewportParents.at(x))
+      if(y==down)return true;
+  }
+  return false;
+}
+
+
+bool Scene2D::isUpCircularNodeInNode(size_t up,size_t down)const{
+  if(up==down)return true;
+  if(this->nodeParentNodes.count(up)!=0)
+    for(auto const&x:this->nodeParentNodes.at(up))
+      if(this->isUpCircularNodeInNode(x,down))return true;
+  if(this->nodeParentLayers.count(up)==0)return false;
+  for(auto const&x:this->nodeParentLayers.at(up)){
+    if(this->layerParents.count(x)==0)continue;
+    for(auto const&y:this->layerParents.at(x)){
+      if(this->viewportParents.count(y)==0)continue;
+      for(auto const&z:this->viewportParents.at(y))
+        if(z==down)return true;
+    }
+  }
+  return false;
+}
+
+bool Scene2D::isDownCircularViewportInNode(size_t up,size_t down)const{
+  for(auto const&x:this->viewports.at(down)->layers){
+    auto const&l=this->layers.at(x);
+    if(up==l->root)return true;
+    if(this->nodes.count(l->root)==0)continue;
+    if(this->isDownCircularNodeInNode(up,l->root))return true;
+  }
+  return false;
+}
+
+bool Scene2D::isDownCircularLayerInViewport(size_t up,size_t down)const{
+  auto const&l=this->layers.at(down);
+  if(this->nodes.count(l->root)==0)return false;
+  return this->isDownCircularNodeInViewport(up,l->root);
+}
+
+bool Scene2D::isDownCircularNodeInViewport(size_t up,size_t down)const{
+  auto const&n=this->nodes.at(down);
+  for(auto const&x:n->viewports){
+    if(x==up)return true;
+    auto const&v=this->viewports.at(x);
+    for(auto const&y:v->layers)
+      if(this->isDownCircularLayerInViewport(up,y))return true;
+  }
+  for(auto const&x:n->childs)
+    if(this->isDownCircularNodeInViewport(up,x))return true;
+  return false;
+}
+
+
+bool Scene2D::isDownCircularNodeInLayer(size_t up,size_t down)const{
+  auto const&n=this->nodes.at(down);
+  for(auto const&x:n->childs)
+    if(this->isDownCircularNodeInLayer(up,x))return true;
+  for(auto const&x:n->viewports){
+    auto const&v = this->viewports.at(x);
+    for(auto const&y:v->layers){
+      if(y==up)return true;
+      auto const&l=this->layers.at(y);
+      if(this->nodes.count(l->root)==0)continue;
+      if(this->isDownCircularNodeInLayer(up,l->root))return true;
+    }
+  }
+  return false;
+}
+
+bool Scene2D::isDownCircularNodeInNode(size_t up,size_t down)const{
+  if(up==down)return true;
+  auto const&n=this->nodes.at(down);
+  for(auto const&x:n->childs)
+    if(this->isDownCircularNodeInNode(up,x))return true;
+  for(auto const&x:n->viewports){
+    auto const&v=this->viewports.at(x);
+    for(auto const&y:v->layers){
+      auto const&l=this->layers.at(y);
+      if(l->root==up)return true;
+      if(this->nodes.count(l->root)==0)continue;
+      if(this->isDownCircularNodeInNode(up,l->root))return true;
+    }
+  }
+  return false;
+}
 
 Draw2D::Draw2D(Context const&gl){
   assert(this!=nullptr);
@@ -968,6 +1100,10 @@ void Draw2D::insertLayer(size_t viewport,size_t layer){
     ge::core::printError(GE_CORE_FCENAME,"there is no such layer",viewport,layer);
     return;
   }
+  if(s->isUpCircularLayerInViewport(viewport,layer)||s->isDownCircularLayerInViewport(viewport,layer)){
+    ge::core::printError(GE_CORE_FCENAME,"circular dependence",viewport,layer);
+    return;
+  }
   assert(s->viewports.at(viewport)!=nullptr);
   auto&layers=s->viewports.at(viewport)->layers;
   if(std::find(layers.begin(),layers.end(),layer)!=layers.end())return;
@@ -988,7 +1124,10 @@ void Draw2D::insertViewport(size_t node,size_t viewport){
     ge::core::printError(GE_CORE_FCENAME,"there is no such viewport",viewport,node);
     return;
   }
-
+  if(s->isUpCircularViewportInNode(node,viewport)||s->isDownCircularViewportInNode(node,viewport)){
+    ge::core::printError(GE_CORE_FCENAME,"circular dependence",viewport,node);
+    return;
+  }
   assert(s->nodes.at(node)!=nullptr);
   auto&viewports=s->nodes.at(node)->viewports;
   if(std::find(viewports.begin(),viewports.end(),viewport)!=viewports.end())return;
@@ -1009,7 +1148,10 @@ void Draw2D::insertNode(size_t toNode,size_t node){
     ge::core::printError(GE_CORE_FCENAME,"there is no such node",toNode,node);
     return;
   }
-
+  if(s->isUpCircularNodeInNode(toNode,node)||s->isDownCircularNodeInNode(toNode,node)){
+    ge::core::printError(GE_CORE_FCENAME,"circular dependence",toNode,node);
+    return;
+  }
   assert(s->nodes.at(toNode)!=nullptr);
   auto&nodes=s->nodes.at(toNode)->childs;
   if(std::find(nodes.begin(),nodes.end(),node)!=nodes.end())return;
@@ -1028,6 +1170,10 @@ void Draw2D::setLayerNode(size_t layer,size_t node){
   }
   if(!this->isNode(node)){
     ge::core::printError(GE_CORE_FCENAME,"there is no such node",layer,node);
+    return;
+  }
+  if(s->isUpCircularNodeInLayer(layer,node)||s->isDownCircularNodeInLayer(layer,node)){
+    ge::core::printError(GE_CORE_FCENAME,"circular dependence",layer,node);
     return;
   }
   assert(s->layers.at(layer)!=nullptr);

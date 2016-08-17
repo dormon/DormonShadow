@@ -196,6 +196,7 @@ bool Application::init(int argc,char*argv[]){
   this->draw2D->insertLayer(vv,ll);
   this->draw2D->setLayerNode(ll,nn);
   this->draw2D->setRootViewport(vv);
+  this->draw2D->insertViewport(nn,vv);
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(0,0),glm::vec2(100,100),1,glm::vec4(0,1,0,1))));
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(100,100),glm::vec2(-100,300),2,glm::vec4(1,1,0,1))));
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Point>(glm::vec2(-30,-50),10,glm::vec4(0,1,1,1))));
