@@ -38,6 +38,9 @@ class Scene2D{
     std::shared_ptr<Program>splineProgram;
     std::shared_ptr<Program>textProgram;
     std::shared_ptr<Texture>fontTexture;
+    std::shared_ptr<Program>stencilProgram;
+    std::shared_ptr<VertexArray>stencilVAO;
+
     std::map<size_t,std::shared_ptr<Viewport>>viewports;
     std::map<size_t,std::shared_ptr<Layer>>layers;
     std::map<size_t,std::shared_ptr<Node>>nodes;
@@ -113,6 +116,13 @@ class Scene2D{
           {std::make_shared<Shader>(GL_VERTEX_SHADER,textVS),
           std::make_shared<Shader>(GL_GEOMETRY_SHADER,textGS),
           std::make_shared<Shader>(GL_FRAGMENT_SHADER,textFS)});
+
+      
+      this->stencilProgram = std::make_shared<Program>();
+      this->stencilProgram->link(
+          {std::make_shared<Shader>(GL_VERTEX_SHADER,stencilVS)});
+      this->stencilVAO = std::make_shared<VertexArray>();
+
     }
 };
 
@@ -188,19 +198,32 @@ class Viewport{
           glm::max(glm::max(wp[0].x,wp[1].x),glm::max(wp[2].x,wp[3].x)),
           glm::max(glm::max(wp[0].y,wp[1].y),glm::max(wp[2].y,wp[3].y)))-op;
       gl.glViewport(op.x,op.y,os.x,os.y);
-      auto viewTranslate=glm::mat3(1.f);
-      viewTranslate[2] = glm::vec3(-cameraPosition,1.f);
-      auto viewRotation = glm::mat3(1.f);
-      viewRotation[0].x = glm::cos(this->cameraAngle);
-      viewRotation[0].y = -glm::sin(this->cameraAngle);
-      viewRotation[1].x = glm::sin(this->cameraAngle);
-      viewRotation[1].y = glm::cos(this->cameraAngle);
-      auto viewScale = glm::mat3(1.f);
-      viewScale[0].x = cameraScale;
-      viewScale[1].y = cameraScale;
+      auto viewTranslate = Draw2D::translate(-cameraPosition);
+      auto viewRotation = Draw2D::rotate(this->cameraAngle);
+      auto viewScale = Draw2D::scale(cameraScale);
       glm::mat3 viewMatrix = viewScale*viewRotation*viewTranslate;
 
       for(auto const&x:this->layers){
+        gl.glDisable(GL_DEPTH_TEST);
+        gl.glStencilFunc(GL_ALWAYS,0,0);
+        gl.glStencilOp(GL_KEEP,GL_KEEP,GL_ZERO);
+        scene->stencilVAO->bind();
+        scene->stencilProgram->use();
+        scene->stencilProgram->set2f("a",-1,-1);
+        scene->stencilProgram->set2f("b",+1,-1);
+        scene->stencilProgram->set2f("c",-1,+1);
+        scene->stencilProgram->set2f("d",+1,+1);
+        gl.glDrawArrays(GL_TRIANGLE_STRIP,0,4);
+        gl.glStencilOp(GL_KEEP,GL_KEEP,GL_INCR);
+        scene->stencilProgram->set2f("a",-1+2*wp[0].x/os.x,-1+2*wp[0].y/os.y);
+        scene->stencilProgram->set2f("b",-1+2*wp[1].x/os.x,-1+2*wp[1].y/os.y);
+        scene->stencilProgram->set2f("c",-1+2*wp[2].x/os.x,-1+2*wp[2].y/os.y);
+        scene->stencilProgram->set2f("d",-1+2*wp[3].x/os.x,-1+2*wp[3].y/os.y);
+        gl.glDrawArrays(GL_TRIANGLE_STRIP,0,4);
+        scene->stencilVAO->unbind();
+        gl.glStencilOp(GL_KEEP,GL_KEEP,GL_KEEP);
+        gl.glStencilFunc(GL_EQUAL,1,0xff);
+        gl.glEnable(GL_DEPTH_TEST);
         auto ii = scene->layers.find(x);
         assert(ii!=scene->layers.end());
         ii->second->draw(viewMatrix*modelMatrix,projectionMatrix,scene);
@@ -572,7 +595,8 @@ void Draw2D::draw(){
   auto const&gl=this->_impl->gl;
   auto*s = this->_impl;
   gl.glClearColor(0,0,0,0);
-  gl.glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
+  gl.glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+  gl.glEnable(GL_STENCIL_TEST);
 
   if(s->viewports.count(s->rootViewport)!=0){
     auto&v=s->viewports.at(s->rootViewport);

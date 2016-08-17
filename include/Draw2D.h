@@ -175,7 +175,34 @@ class Draw2D{
     void                      deletePrimitive (size_t primitive);
     size_t createPrimitive(std::shared_ptr<Primitive>const&primitive);
 
+    static glm::mat3 translate(glm::vec2 const&pos);
+    static glm::mat3 rotate(float angle);
+    static glm::mat3 scale(float scale);
+
     void clear();
   protected:
     Scene2D*_impl;
 };
+
+inline glm::mat3 Draw2D::translate(glm::vec2 const&pos){
+  auto result = glm::mat3(1.f);
+  result[2]=glm::vec3(pos,1);
+  return result;
+}
+
+inline glm::mat3 Draw2D::rotate(float angle){
+  auto result = glm::mat3(1.f);
+  result[0].x =  glm::cos(angle);
+  result[0].y = -glm::sin(angle);
+  result[1].x =  glm::sin(angle);
+  result[1].y =  glm::cos(angle);
+  return result;
+}
+
+inline glm::mat3 Draw2D::scale(float scale){
+  auto result = glm::mat3(1.f);
+  result[0].x=scale;
+  result[1].y=scale;
+  return result;
+}
+

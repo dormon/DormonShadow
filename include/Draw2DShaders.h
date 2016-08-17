@@ -355,3 +355,17 @@ const std::string textFS=
 "  fColor = vec4(gColor.rgb,font(int(gChar),gCoord));\n"
 "}\n";
 
+const std::string stencilVS=
+"#version 450\n"
+"uniform vec2 a;\n"
+"uniform vec2 b;\n"
+"uniform vec2 c;\n"
+"uniform vec2 d;\n"
+"void main(){\n"
+"  if(gl_VertexID==0)gl_Position = vec4(a,1,1);\n"
+"  if(gl_VertexID==1)gl_Position = vec4(b,1,1);\n"
+"  if(gl_VertexID==2)gl_Position = vec4(c,1,1);\n"
+"  if(gl_VertexID==3)gl_Position = vec4(d,1,1);\n"
+"}\n";
+
+
