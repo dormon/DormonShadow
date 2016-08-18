@@ -37,6 +37,7 @@ class Line: public Primitive{
       this->points[1]=b;
       this->width = width;
     }
+    Line(float ax,float ay,float bx,float by,float width,glm::vec4 const&color = glm::vec4(1.f)):Line(glm::vec2(ax,ay),glm::vec2(bx,by),width,color){}
     virtual ~Line(){}
 };
 
@@ -49,6 +50,7 @@ class Point: public Primitive{
       this->point = position;
       this->size = radius;
     }
+    Point(float x,float y,float r,glm::vec4 const&color = glm::vec4(1.f)):Point(glm::vec2(x,y),r,color){}
     virtual ~Point(){}
 };
 
@@ -63,6 +65,7 @@ class Circle: public Primitive{
       this->size = radius;
       this->width = width;
     }
+    Circle(float x,float y,float r,float w,glm::vec4 const&color = glm::vec4(1.f)):Circle(glm::vec2(x,y),r,w,color){}
 };
 
 class Triangle: public Primitive{
@@ -74,6 +77,7 @@ class Triangle: public Primitive{
       this->points[1]=b;
       this->points[2]=c;
     }
+    Triangle(float ax,float ay,float bx,float by,float cx,float cy,glm::vec4 const&color = glm::vec4(1.f)):Triangle(glm::vec2(ax,ay),glm::vec2(bx,by),glm::vec2(cx,cy),color){}
 };
 
 class Text: public Primitive{
@@ -89,6 +93,7 @@ class Text: public Primitive{
       this->position = position;
       this->direction = direction;
     }
+    Text(std::string const&data,float size,glm::vec4 const&color = glm::vec4(1.f),glm::vec2 const&position = glm::vec2(0.f),glm::vec2 const&direction = glm::vec2(1.f,0.f)):Text(data,size,position,direction,color){}
 };
 
 class Spline: public Primitive{

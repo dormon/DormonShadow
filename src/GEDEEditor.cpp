@@ -1,5 +1,6 @@
 #include<GEDEEditor.h>
 #include<tuple>
+#include<algorithm>
 
 using namespace gde;
 
@@ -18,8 +19,8 @@ namespace ui{
       GRID      = 2,
       RECTANGLE = 3,
     }type;
-    Element(Type const&t,glm::vec2 const&minSize = glm::vec2(0.f)):type(t),_minSize(minSize){}
-    virtual ~Element(){}
+    Element(Type const&t,std::vector<Primitive*>const&prims = {},glm::vec2 const&minSize = glm::vec2(0.f)):type(t),primitives(prims),_minSize(minSize){}
+    virtual ~Element(){for(auto const&x:this->primitives)delete x;}
     virtual glm::vec2 getSize() = 0;
     glm::vec2 getPosition(){
       assert(this!=nullptr);
@@ -27,6 +28,65 @@ namespace ui{
       if(this->_changedGuts)
         this->_position = this->_parent->_getPositionOf(this);
       return this->_position;
+    }
+    std::vector<Primitive*>primitives;
+    virtual void addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node){
+      glm::vec2 p = this->getPosition();
+      glm::vec2 s = this->getSize();
+      for(auto const&x:this->primitives){
+        size_t primId = -1;
+        switch(x->type){
+          case Primitive::LINE:
+            std::cout<<"p: "<<p.x<<","<<p.y<<std::endl;
+            std::cout<<"s: "<<s.x<<","<<s.y<<std::endl;
+            std::cout<< ((Line*)x)->points[0].x*s.x+p.x<<","<< ((Line*)x)->points[0].y*s.y+p.y<<std::endl;
+            std::cout<< ((Line*)x)->points[1].x*s.x+p.x<<","<< ((Line*)x)->points[1].y*s.y+p.y<<std::endl;
+            primId = draw2D->createPrimitive(std::make_shared<Line>(
+                  ((Line*)x)->points[0]*s+p,
+                  ((Line*)x)->points[1]*s+p,
+                  ((Line*)x)->width,
+                  x->color));
+            break;
+          case Primitive::POINT:
+            primId = draw2D->createPrimitive(std::make_shared<Point>(
+                  ((Point*)x)->point*s+p,
+                  ((Point*)x)->size,
+                  x->color));
+            break;
+          case Primitive::CIRCLE:
+            primId = draw2D->createPrimitive(std::make_shared<Circle>(
+                  ((Circle*)x)->point*s+p,
+                  ((Circle*)x)->size,
+                  ((Circle*)x)->width,
+                  x->color));
+            break;
+          case Primitive::TRIANGLE:
+            primId = draw2D->createPrimitive(std::make_shared<Triangle>(
+                  ((Triangle*)x)->points[0]*s+p,
+                  ((Triangle*)x)->points[1]*s+p,
+                  ((Triangle*)x)->points[2]*s+p,
+                  x->color));
+            break;
+          case Primitive::TEXT:
+            primId = draw2D->createPrimitive(std::make_shared<Text>(
+                  ((Text*)x)->data,
+                  ((Text*)x)->size,
+                  ((Text*)x)->position*s+p,
+                  ((Text*)x)->direction,
+                  x->color));
+            break;
+          case Primitive::SPLINE:
+            primId = draw2D->createPrimitive(std::make_shared<Spline>(
+                  ((Spline*)x)->points[0]*s+p,
+                  ((Spline*)x)->points[1]*s+p,
+                  ((Spline*)x)->points[2]*s+p,
+                  ((Spline*)x)->points[3]*s+p,
+                  ((Spline*)x)->width,
+                  x->color));
+            break;
+        }
+        draw2D->insertPrimitive(node,primId);
+      }
     }
     protected:
     glm::vec2 _minSize;
@@ -56,9 +116,14 @@ namespace ui{
   template<size_t X,typename std::enable_if<(X==0||X==1),unsigned>::type>
     class Split: public Element{
       public:
-        Split(std::vector<Element*>const&elements,Spacing const&spacing,glm::vec2 const&minSize = glm::vec2(0)):Element((Type)(SPLITX+X),minSize),_inners(elements),_spacing(spacing){
+        Split(
+            std::vector<Element*>const&elements,
+            std::vector<Primitive*>const&prims = {},
+            Spacing const&spacing = LEFT,
+            glm::vec2 const&minSize = glm::vec2(0)):Element((Type)(SPLITX+X),prims,minSize),_inners(elements),_spacing(spacing){
           assert(this!=nullptr);
           assert(elements.size()>0);
+          if(X==1)std::reverse(this->_inners.begin(),this->_inners.end());
           for(auto const&x:elements)x->_parent = this;
           this->_signalParents();
           for(auto const&x:elements)
@@ -114,7 +179,9 @@ namespace ui{
 
             for(size_t i=0;i<this->_inners.size();++i){
               assert(this->_positions.count(this->_inners.at(i))!=0);
-              this->_positions.at(this->_inners.at(i))=offset;
+              glm::vec2 newPos = glm::vec2(0.f);
+              newPos[X] = offset;
+              this->_positions.at(this->_inners.at(i))=newPos;
               if(useLargestStep)offset+=largestPart;
               else offset+=parts.at(i);
             }
@@ -122,20 +189,30 @@ namespace ui{
           }
           return this->_size;
         }
+        virtual void addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node)override{
+          this->Element::addToNode(draw2D,node);
+          for(auto const&x:this->_inners)
+            x->addToNode(draw2D,node);
+        }
       protected:
         std::vector<Element*>_inners;
         Spacing _spacing;
         std::map<Element const*,glm::vec2>_positions;
         virtual glm::vec2 _getPositionOf(Element*e)override{
           assert(this!=nullptr);
-          assert(this->_position.count(e)!=0);
+          assert(this->_positions.count(e)!=0);
           return this->getPosition()+this->_positions.at(e);
         }
     };
 
   class Grid: public Element{
     public:
-      Grid(std::vector<std::vector<Element*>>const&elements,Spacing const&spacingX,Spacing const&spacingY,glm::vec2 const&minSize = glm::vec2(0)):Element(GRID,minSize),_inners(elements){
+      Grid(
+          std::vector<std::vector<Element*>>const&elements,
+          std::vector<Primitive*>const&prims,
+          Spacing const&spacingX = LEFT,
+          Spacing const&spacingY = LEFT,
+          glm::vec2 const&minSize = glm::vec2(0)):Element(GRID,prims,minSize),_inners(elements){
         assert(this!=nullptr);
         this->_gridSize.x = elements.size();
         assert(elements.size()>0);
@@ -230,6 +307,12 @@ namespace ui{
         }
         return this->_size;
       }
+      virtual void addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node)override{
+        this->Element::addToNode(draw2D,node);
+        for(auto const&x:this->_inners)
+          for(auto const&y:x)
+          y->addToNode(draw2D,node);
+      }
     protected:
       glm::uvec2 _gridSize;
       std::vector<std::vector<Element*>>_inners;
@@ -244,37 +327,43 @@ namespace ui{
 
   class Rectangle: public Element{
     public:
-      Rectangle(glm::vec2 const&minSize = glm::vec2(0.f)):Element(RECTANGLE,minSize){}
+      Rectangle(std::vector<Primitive*>const&prims = {},glm::vec2 const&minSize = glm::vec2(0.f)):Element(RECTANGLE,prims,minSize){}
+      Rectangle(float x=0,float y=0,std::vector<Primitive*>const&prims = {}):Rectangle(prims,glm::vec2(x,y)){}
       virtual ~Rectangle(){}
       virtual glm::vec2 getSize()override{
         assert(this!=nullptr);
         return this->_minSize;
       }
-  };
-  
-  template<size_t N,typename T,typename...ARGS>
-    std::vector<T*>repeat(ARGS...args){
-      std::vector<T*>result;
-      for(size_t i=0;i<N;++i)
-        result.push_back(new T(args...));
-      return result;
-    }
-  template<size_t X,size_t Y,typename T,typename...ARGS>
-    std::vector<std::vector<T*>>repeat(ARGS...args){
-      std::vector<std::vector<T*>>result;
-      for(size_t j=0;j<Y;++j){
-        auto row = std::vector<T*>();
-        for(size_t i=0;i<X;++i)
-          row.push_back(new T(args...));
-        result.push_back(row);
+      virtual void addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node)override{
+        this->Element::addToNode(draw2D,node);
       }
-      return result;
+    protected:
+      virtual glm::vec2 _getPositionOf(Element*)override{
+        return glm::vec2(0.f);
+      }
+  };
+
+  std::vector<Element*>repear1D(size_t N,Element*(*fce)(size_t i)){
+    std::vector<Element*>result;
+    for(size_t i=0;i<N;++i)
+      result.push_back(fce(i));
+    return result;
+  }
+  std::vector<std::vector<Element*>>repear2D(size_t X,size_t Y,Element*(*fce)(size_t x,size_t y)){
+    std::vector<std::vector<Element*>>result;
+    for(size_t y=0;y<Y;++y){
+      auto row = std::vector<Element*>();
+      for(size_t x=0;x<X;++x)row.push_back(fce(x,y));
+      result.push_back(row);
     }
+    return result;
+  }
 
 }
 
 
 void Function::create(){
+  /*
   size_t inputLength = 0;
   for(auto const&x:this->inputNames)
     inputLength = glm::max(inputLength,x.length());
@@ -285,7 +374,7 @@ void Function::create(){
   bool hasOutput = this->outputName!="";
 
   this->node = this->draw2D->createNode();
-
+  
   {//create rectangleLines
     size_t wa =
       this->lineWidth+
@@ -468,54 +557,31 @@ void Function::create(){
     for(auto const&x:this->inputText)
       this->draw2D->insertPrimitive(this->node,x);
   }
+  */
 
-  class Push{
-    glm::uvec2 oldOrigin,oldSize;
-    glm::uvec2&refOrigin,&refSize;
-    public:
-    Push(glm::uvec2&origin,glm::uvec2&size):refOrigin(origin),refSize(size){oldOrigin = origin;oldSize = size;}
-    ~Push(){refOrigin = oldOrigin;refSize = oldSize;}
-  };
-
-  size_t wa =
-    this->lineWidth+
-    this->margin+
-    inputLength*this->fontSize+
-    this->inputOutputDistance+
-    outputLength*this->fontSize+
-    this->textIndent+
-    this->outputRadius*2+
-    this->margin+
-    this->lineWidth;
-  size_t wb = 
-    this->lineWidth+
-    this->captionMargin+
-    captionLength*this->captionFontSize+
-    this->captionMargin+
-    this->lineWidth;
-  size_t width = glm::max(wa,wb);
-  size_t height;
-  height = 
-    this->lineWidth+
-    this->margin+
-    this->inputNames.size()*inputLineHeight+
-    (this->inputNames.size()==0?(size_t)hasOutput:(this->inputNames.size()-1))*this->inputSpacing+
-    this->margin+
-    this->lineWidth+
-    this->captionMargin+
-    this->captionFontSize*2+
-    this->captionMargin+
-    this->lineWidth;
-  glm::uvec2 origin = glm::uvec2(0,0);
-  glm::uvec2 size = glm::uvec2(width,height);
-  {
-    //
-    {
-      Push Stack{origin,size};
-      origin+=glm::uvec2(this->lineWidth);
-      size-=glm::uvec2(this->lineWidth*2);
-    }
-  }
+  this->node = this->draw2D->createNode();
+  using namespace ui;
+  auto root = new Split<1>({
+      new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),//bottom line
+      new Split<0>({
+        new Rectangle(this->lineWidth,0),//left line
+        new Split<1>({
+          new Split<1>({
+            new Rectangle(0,this->captionMargin),
+            new Split<0>({
+              new Rectangle(this->captionMargin,0),
+              new Rectangle(this->captionFontSize*this->functionName.length(),this->captionFontSize*2),
+              new Rectangle(this->captionMargin,0),
+              }),
+            new Rectangle(0,this->captionMargin),
+            }),
+          new Rectangle(0,this->lineWidth),//caption line
+          }),
+        new Rectangle(this->lineWidth,0),//right line
+        }),
+      new Rectangle(0,this->lineWidth),});//top line
+  root->addToNode(this->draw2D,node);
+  delete root;
   /*
      {//output circle
      size_t px =
