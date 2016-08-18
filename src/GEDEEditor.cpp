@@ -214,6 +214,7 @@ namespace ui{
           return this->getPosition()+this->_positions.at(e);
         }
         virtual void _setSize(glm::vec2 const&ns)override{
+          std::cout<<"setSize: "<<ns.x<<","<<ns.y<<std::endl;
           glm::vec2 newSize = ns;
           assert(this!=nullptr);
           float largestPart = 0;
@@ -483,12 +484,15 @@ namespace ui{
 
   class Rectangle: public Element{
     public:
-      Rectangle(std::vector<Primitive*>const&prims = {},glm::vec2 const&minSize = glm::vec2(0.f)):Element(RECTANGLE,prims,minSize){}
+      Rectangle(std::vector<Primitive*>const&prims = {},glm::vec2 const&minSize = glm::vec2(0.f)):Element(RECTANGLE,prims,minSize){
+        assert(this!=nullptr);
+        this->_size = minSize;
+      }
       Rectangle(float x=0,float y=0,std::vector<Primitive*>const&prims = {}):Rectangle(prims,glm::vec2(x,y)){}
       virtual ~Rectangle(){}
       virtual glm::vec2 getSize()override{
         assert(this!=nullptr);
-        return this->_minSize;
+        return this->_size;
       }
       virtual void addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node)override{
         this->Element::addToNode(draw2D,node);
