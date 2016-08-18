@@ -37,10 +37,6 @@ namespace ui{
         size_t primId = -1;
         switch(x->type){
           case Primitive::LINE:
-            std::cout<<"p: "<<p.x<<","<<p.y<<std::endl;
-            std::cout<<"s: "<<s.x<<","<<s.y<<std::endl;
-            std::cout<< ((Line*)x)->points[0].x*s.x+p.x<<","<< ((Line*)x)->points[0].y*s.y+p.y<<std::endl;
-            std::cout<< ((Line*)x)->points[1].x*s.x+p.x<<","<< ((Line*)x)->points[1].y*s.y+p.y<<std::endl;
             primId = draw2D->createPrimitive(std::make_shared<Line>(
                   ((Line*)x)->points[0]*s+p,
                   ((Line*)x)->points[1]*s+p,
@@ -490,23 +486,17 @@ namespace ui{
         return glm::vec2(0.f);
       }
       virtual void _setSize(glm::vec2 const&newSize)override{
-        std::cout<<"Rectangle::_setSize("<<newSize.x<<","<<newSize.x<<")";
-        if(this->primitives.size()){
-          if(this->primitives.at(0)->type == Primitive::LINE)std::cout<<"LINE";
-          if(this->primitives.at(0)->type == Primitive::TEXT)std::cout<<"TEXT";
-        }
-        std::cout<<std::endl;
         this->_size = newSize;
       }
   };
 
-  std::vector<Element*>repear1D(size_t N,Element*(*fce)(size_t i)){
+  std::vector<Element*>repear1D(size_t N,std::function<Element*(size_t)>const&fce){
     std::vector<Element*>result;
     for(size_t i=0;i<N;++i)
       result.push_back(fce(i));
     return result;
   }
-  std::vector<std::vector<Element*>>repear2D(size_t X,size_t Y,Element*(*fce)(size_t x,size_t y)){
+  std::vector<std::vector<Element*>>repear2D(size_t X,size_t Y,std::function<Element*(size_t,size_t)>const&fce){
     std::vector<std::vector<Element*>>result;
     for(size_t y=0;y<Y;++y){
       auto row = std::vector<Element*>();
@@ -538,11 +528,28 @@ void Function::create(){
               }),
             new Rectangle(0,this->captionMargin),
             },{new Triangle(0,0,1,0,1,1,this->captionBackgrounColor),new Triangle(0,0,1,1,0,1,this->captionBackgrounColor)}),
-        new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),//caption line
+          new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),//caption line
+          new Split<0>({
+            new Rectangle(this->margin,0),
+            new Split<1>({
+              new Rectangle(0,this->margin),
+              new Split<0>({
+                new Split<1>(//inputs
+                  repear1D(this->inputNames.size(),[this](size_t i)->Element*{
+                    return new Rectangle(this->fontSize*this->inputNames[i].length(),this->fontSize*2,{new Text(this->inputNames[i],this->fontSize,this->captionColor)});
+                    })
+                  ),
+                new Rectangle(this->inputOutputDistance,0),
+                //output
+                }),
+              new Rectangle(0,this->margin),
+              }),
+            new Rectangle(this->margin,0),
+            },{new Triangle(0,0,1,0,1,1,this->backgroundColor),new Triangle(0,0,1,1,0,1,this->backgroundColor)}),
+          }),
+        new Rectangle(this->lineWidth,0,{new Line(.5,0,.5,1,this->lineWidth,this->lineColor)}),//right line
         }),
-      new Rectangle(this->lineWidth,0,{new Line(.5,0,.5,1,this->lineWidth,this->lineColor)}),//right line
-      }),
-       new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),});//bottom line
+      new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),});//bottom line
   root->addToNode(this->draw2D,node);
   delete root;
 #endif
