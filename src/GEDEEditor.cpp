@@ -25,7 +25,7 @@ namespace ui{
     glm::vec2 getPosition(){
       assert(this!=nullptr);
       if(!this->_parent)return glm::vec2(0.f);
-      if(this->_changedGuts)
+      //if(this->_changedGuts)
         this->_position = this->_parent->_getPositionOf(this);
       return this->_position;
     }
@@ -179,7 +179,8 @@ namespace ui{
                     x = largestPart;
                 break;
             }
-            newSize[X] = glm::max(newSize[X],this->_minSize[X]);
+            //newSize[X] = glm::max(newSize[X],this->_minSize[X]);
+            newSize = glm::max(newSize,this->_minSize);
             this->_size = newSize;
 
             float offset = 0;
@@ -214,25 +215,23 @@ namespace ui{
           return this->getPosition()+this->_positions.at(e);
         }
         virtual void _setSize(glm::vec2 const&ns)override{
-          std::cout<<"setSize: "<<ns.x<<","<<ns.y<<std::endl;
           glm::vec2 newSize = ns;
+          if(newSize==this->_size)return;
           assert(this!=nullptr);
-          float largestPart = 0;
           std::vector<float>parts;
-          for(auto const&x:this->_inners){
+          for(auto const&x:this->_inners)
             parts.push_back(this->_sizes.at(x)[X]);
-            largestPart = glm::max(largestPart,this->_sizes.at(x)[X]);
-          }
+          assert(newSize[X]>=this->_minSize[X]);
           switch(this->_spacing){
             case LEFT:
-              if(newSize[X]<this->_minSize[X])
-                parts.back() += this->_minSize[X]-newSize[X];
+              if(newSize[X]>this->_size[X])
+                parts.back() += newSize[X]-this->_size[X];
               break;
             case MIDDLE:
-              if(newSize[X]<this->_minSize[X]){
+              if(newSize[X]>this->_size[X]){
                 float first = parts.at(0);
                 float last  = parts.back();
-                float toAdd = this->_minSize[X]-newSize[X];
+                float toAdd = newSize[X]-this->_size[X];
                 if(first+toAdd<last){
                   parts.at(0)+=toAdd;
                 }else if(last+toAdd<first){
@@ -244,20 +243,14 @@ namespace ui{
               }
               break;
             case RIGHT:
-              if(newSize[X]<this->_minSize[X])
-                parts.at(0) += this->_minSize[X]-newSize[X];
+              if(newSize[X]>this->_size[X])
+                parts.at(0) += newSize[X]-this->_size[X];
               break;
             case EQUAL:
-              newSize[X] = largestPart*this->_inners.size();
-              if(newSize[X]<this->_minSize[X])
-                for(auto&x:parts)
-                  x = this->_minSize[X]/this->_inners.size();
-              else
-                for(auto&x:parts)
-                  x = largestPart;
+              for(auto&x:parts)
+                x = newSize[X]/this->_inners.size();
               break;
           }
-          newSize = glm::max(newSize,this->_minSize);
           this->_size = newSize;
 
           float offset = 0;
@@ -407,11 +400,11 @@ namespace ui{
       }
       virtual void _setSize(glm::vec2 const&ns)override{
         glm::vec2 newSize = ns;
+        if(newSize==this->_size)return;
         std::vector<std::vector<glm::vec2>>parts;
         std::vector<float>rcSize[2];
         rcSize[0].resize(this->_gridSize[1],0.f);
         rcSize[1].resize(this->_gridSize[0],0.f);
-        glm::vec2 largestPart = glm::vec2(0);
         for(size_t j=0;j<this->_gridSize.y;++j){
           auto row = std::vector<glm::vec2>();
           for(size_t i=0;i<this->_gridSize.x;++i)
@@ -423,22 +416,20 @@ namespace ui{
             auto is = parts.at(j).at(i);
             rcSize[0][j] = glm::max(rcSize[0][j],is[1]);
             rcSize[1][i] = glm::max(rcSize[1][i],is[0]);
-            largestPart.x = glm::max(largestPart.x,is.x);
-            largestPart.y = glm::max(largestPart.y,is.y);
           }
         }
 
         for(size_t i=0;i<2;++i)
           switch(this->_spacings[i]){
             case LEFT:
-              if(newSize[i]<this->_minSize[i])
-                rcSize[1-i].back() += this->_minSize[i]-newSize[i];
+              if(newSize[i]>this->_size[i])
+                rcSize[1-i].back() += newSize[i]-this->_size[i];
               break;
             case MIDDLE:
-              if(newSize[i]<this->_minSize[i]){
+              if(newSize[i]>this->_size[i]){
                 float first = rcSize[1-i].at(0);
                 float last  = rcSize[1-i].back();
-                float toAdd = this->_minSize[i]-newSize[i];
+                float toAdd = newSize[i]-this->_size[i];
                 if(first+toAdd<last){
                   rcSize[1-i].at(0)+=toAdd;
                 }else if(last+toAdd<first){
@@ -450,20 +441,17 @@ namespace ui{
               }
               break;
             case RIGHT:
-              if(newSize[i]<this->_minSize[i])
-                rcSize[1-i].at(0) += this->_minSize[i]-newSize[i];
+              if(newSize[i]>this->_size[i])
+                rcSize[1-i].at(0) += newSize[i]-this->_size[i];
               break;
             case EQUAL:
-              newSize[i] = largestPart[i]*this->_gridSize[i];
-              if(newSize[i]<this->_minSize[i])
+              if(newSize[i]>this->_size[i])
                 for(auto&x:rcSize[1-i])
-                  x = this->_minSize[i]/this->_gridSize[i];
-              else
-                for(auto&x:rcSize[1-i])
-                  x = largestPart[i];
+                  x = newSize[i]/this->_gridSize[i];
               break;
           }
-        this->_size = glm::max(newSize,this->_minSize);
+        this->_size = newSize;
+
         glm::vec2 o = glm::vec2(0.f);
         for(size_t j=0;j<this->_gridSize.y;++j){
           o.x = 0.f;
@@ -502,6 +490,12 @@ namespace ui{
         return glm::vec2(0.f);
       }
       virtual void _setSize(glm::vec2 const&newSize)override{
+        std::cout<<"Rectangle::_setSize("<<newSize.x<<","<<newSize.x<<")";
+        if(this->primitives.size()){
+          if(this->primitives.at(0)->type == Primitive::LINE)std::cout<<"LINE";
+          if(this->primitives.at(0)->type == Primitive::TEXT)std::cout<<"TEXT";
+        }
+        std::cout<<std::endl;
         this->_size = newSize;
       }
   };
@@ -526,270 +520,83 @@ namespace ui{
 
 
 void Function::create(){
+  this->captionMargin = 10;
+
   /*
-     size_t inputLength = 0;
-     for(auto const&x:this->inputNames)
-     inputLength = glm::max(inputLength,x.length());
-     size_t outputLength = this->outputName.length();
-     size_t captionLength = this->functionName.length();
-
-     size_t inputLineHeight = glm::max(this->inputRadius*2,this->fontSize*2);
-     bool hasOutput = this->outputName!="";
-
      this->node = this->draw2D->createNode();
-
-     {//create rectangleLines
-     size_t wa =
-     this->lineWidth+
-     this->margin+
-     inputLength*this->fontSize+
-     this->inputOutputDistance+
-     outputLength*this->fontSize+
-     this->textIndent+
-     this->outputRadius*2+
-     this->margin+
-     this->lineWidth;
-     size_t wb = 
-     this->lineWidth+
-     this->captionMargin+
-     captionLength*this->captionFontSize+
-     this->captionMargin+
-     this->lineWidth;
-     size_t width = glm::max(wa,wb);
-     size_t height;
-     height = 
-     this->lineWidth+
-     this->margin+
-     this->inputNames.size()*inputLineHeight+
-     (this->inputNames.size()==0?(size_t)hasOutput:(this->inputNames.size()-1))*this->inputSpacing+
-     this->margin+
-     this->lineWidth+
-     this->captionMargin+
-     this->captionFontSize*2+
-     this->captionMargin+
-     this->lineWidth;
-
-     this->rectangleLines[0] = this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(0,0),glm::vec2(width,0),this->lineWidth,this->lineColor));
-     this->rectangleLines[1] = this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(0,0),glm::vec2(0,height),this->lineWidth,this->lineColor));
-     this->rectangleLines[2] = this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(width,0),glm::vec2(width,height),this->lineWidth,this->lineColor));
-     this->rectangleLines[3] = this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(0,height),glm::vec2(width,height),this->lineWidth,this->lineColor));
+     using namespace ui;
+     auto root = new Split<1>({
+     new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),//top line
+     new Split<0>({
+     new Rectangle(this->lineWidth,0,{new Line(.5,0,.5,1,this->lineWidth,this->lineColor)}),//left line
+     new Split<1>({
+     new Split<1>({
+     new Rectangle(0,this->captionMargin*0+100),
+     new Split<0>({
+     new Rectangle(this->captionMargin*0+100,0),
+     new Rectangle(this->captionFontSize*this->functionName.length(),this->captionFontSize,{new Text(this->functionName,this->captionFontSize,this->captionColor)}),
+     new Rectangle(this->captionMargin*0+100,0),
+     }),
+     new Rectangle(0,this->captionMargin*0+100),
+     }),//,{new Triangle(0,0,1,0,1,1,this->captionBackgrounColor),new Triangle(0,0,1,1,0,1,this->captionBackgrounColor)}),
+     new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),//caption line
+     }),
+     new Rectangle(this->lineWidth,0,{new Line(.5,0,.5,1,this->lineWidth,this->lineColor)}),//right line
+     }),
+     new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),});//bottom line
+     root->addToNode(this->draw2D,node);
+     delete root;
+     */
 
 
-     this->draw2D->insertPrimitive(this->node,this->rectangleLines[0]);
-     this->draw2D->insertPrimitive(this->node,this->rectangleLines[1]);
-     this->draw2D->insertPrimitive(this->node,this->rectangleLines[2]);
-     this->draw2D->insertPrimitive(this->node,this->rectangleLines[3]);
-     }
+  this->node = this->draw2D->createNode();
+  using namespace ui;
 
-     {//main triangles
-     size_t wa =
-     this->margin+
-     inputLength*this->fontSize+
-     this->inputOutputDistance+
-     outputLength*this->fontSize+
-     this->textIndent+
-     this->outputRadius*2+
-     this->margin;
-     size_t wb = 
-     this->captionMargin+
-     captionLength*this->captionFontSize+
-     this->captionMargin;
-     size_t width = glm::max(wa,wb);
-     size_t height;
-     height = 
-  this->margin+
-    this->inputNames.size()*inputLineHeight+
-    (this->inputNames.size()==0?(size_t)hasOutput:(this->inputNames.size()-1))*this->inputSpacing+
-    this->margin;
+#if 0
+  //Vertical SPLIT TEST
+  auto root = new Split<1>({
+      new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth)}),//top line
+      new Rectangle(0,30),
+      new Rectangle(4*this->captionFontSize,this->captionFontSize*2,{new Text("AHOJ",8)}),
+      new Rectangle(0,30),
+      new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth)}),//bottom line
+      });
+  root->addToNode(this->draw2D,node);
+  delete root;
+#endif
 
-  size_t px = this->lineWidth;
-  size_t py = this->lineWidth;
+#if 0
+  //HORIZONTAL SPLIT TEST
+  auto root = new Split<0>({
+      new Rectangle(this->lineWidth,0,{new Line(.5,0,.5,1,this->lineWidth)}),//left line
+      new Rectangle(30,0),
+      new Rectangle(4*this->captionFontSize,this->captionFontSize*2,{new Text("AHOJ",8)}),
+      new Rectangle(30,0),
+      new Rectangle(this->lineWidth,0,{new Line(.5,0,.5,1,this->lineWidth)}),//right line
+      });
+  root->addToNode(this->draw2D,node);
+  delete root;
+#endif
 
-  this->rectangleTriangles[0] = this->draw2D->createPrimitive(std::make_shared<Triangle>(glm::vec2(px,py),glm::vec2(px+width,py),glm::vec2(px+width,py+height),this->backgroundColor));
-  this->rectangleTriangles[1] = this->draw2D->createPrimitive(std::make_shared<Triangle>(glm::vec2(px,py),glm::vec2(px+width,py+height),glm::vec2(px,py+height),this->backgroundColor));
-
-  this->draw2D->insertPrimitive(this->node,this->rectangleTriangles[0]);
-  this->draw2D->insertPrimitive(this->node,this->rectangleTriangles[1]);
-}
-
-{//caption line
-  size_t wa =
-    this->margin+
-    inputLength*this->fontSize+
-    this->inputOutputDistance+
-    outputLength*this->fontSize+
-    this->textIndent+
-    this->outputRadius*2+
-    this->margin;
-  size_t wb = 
-    this->captionMargin+
-    captionLength*this->captionFontSize+
-    this->captionMargin;
-  size_t width = glm::max(wa,wb);
-  size_t px = this->lineWidth;
-  size_t py =
-    this->lineWidth+
-    this->margin+
-    this->inputNames.size()*inputLineHeight+
-    (this->inputNames.size()==0?(size_t)hasOutput:(this->inputNames.size()-1))*this->inputSpacing+
-    this->margin;
-
-  this->captionLine = this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(px,py),glm::vec2(px+width,py),this->lineWidth,this->lineColor));
-
-  this->draw2D->insertPrimitive(this->node,this->captionLine);
-}
-
-{//caption triangles
-  size_t wa =
-    this->margin+
-    inputLength*this->fontSize+
-    this->inputOutputDistance+
-    outputLength*this->fontSize+
-    this->textIndent+
-    this->outputRadius*2+
-    this->margin;
-  size_t wb = 
-    this->captionMargin+
-    captionLength*this->captionFontSize+
-    this->captionMargin;
-  size_t width = glm::max(wa,wb);
-  size_t height;
-  height = 
-    this->captionMargin+
-    this->captionFontSize*2+
-    this->captionMargin;
-
-  size_t px = this->lineWidth;
-  size_t py = 
-    this->lineWidth+
-    this->margin+
-    this->inputNames.size()*inputLineHeight+
-    (this->inputNames.size()==0?(size_t)hasOutput:(this->inputNames.size()-1))*this->inputSpacing+
-    this->margin+
-    this->lineWidth;
-
-  this->captionTriangles[0] = this->draw2D->createPrimitive(std::make_shared<Triangle>(glm::vec2(px,py),glm::vec2(px+width,py),glm::vec2(px+width,py+height),this->captionBackgrounColor));
-  this->captionTriangles[1] = this->draw2D->createPrimitive(std::make_shared<Triangle>(glm::vec2(px,py),glm::vec2(px+width,py+height),glm::vec2(px,py+height),this->captionBackgrounColor));
-
-  this->draw2D->insertPrimitive(this->node,this->captionTriangles[0]);
-  this->draw2D->insertPrimitive(this->node,this->captionTriangles[1]);
-}
-
-{//caption
-  size_t px = this->lineWidth+this->captionMargin;
-  size_t py = 
-    this->lineWidth+
-    this->margin+
-    this->inputNames.size()*inputLineHeight+
-    (this->inputNames.size()==0?(size_t)hasOutput:(this->inputNames.size()-1))*this->inputSpacing+
-    this->margin+
-    this->lineWidth+
-    this->captionMargin;
-
-  this->captionText = this->draw2D->createPrimitive(std::make_shared<Text>(this->functionName,this->captionFontSize,glm::vec2(px,py),glm::vec2(1.f,0.f),this->captionColor));
-
-  this->draw2D->insertPrimitive(this->node,this->captionText);
-}
-
-{//inputs circles
-  size_t px = this->lineWidth+this->margin+this->inputRadius;
-  size_t py = 
-    this->lineWidth+
-    this->margin+
-    this->fontSize;
-  size_t step = this->fontSize*2+this->inputSpacing;
-
-  for(size_t i=0;i<this->inputNames.size();++i){
-    this->inputCircle.push_back(this->draw2D->createPrimitive(std::make_shared<Circle>(glm::vec2(px,py),this->inputRadius,this->lineWidth,this->lineColor)));
-    py+=step;
-  }
-  for(auto const&x:this->inputCircle)
-    this->draw2D->insertPrimitive(this->node,x);
-}
-{//inputs texts
-  size_t px = this->lineWidth+this->margin+this->inputRadius*2+this->textIndent;
-  size_t py = 
-    this->lineWidth+
-    this->margin;
-  size_t step = this->fontSize*2+this->inputSpacing;
-
-  for(auto const&x:this->inputNames){
-    this->inputText.push_back(this->draw2D->createPrimitive(std::make_shared<Text>(x,this->fontSize,glm::vec2(px,py),glm::vec2(1.f,0.f),this->textColor)));
-    py+=step;
-  }
-  for(auto const&x:this->inputText)
-    this->draw2D->insertPrimitive(this->node,x);
-}
-*/
-
-this->node = this->draw2D->createNode();
-using namespace ui;
-auto root = new Split<1>({
-    new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),//bottom line
-    new Split<0>({
-      new Rectangle(this->lineWidth,0),//left line
+#if 1
+  //HORIZONTAL THAN VERTICAL SPLIT TEST
+  auto root = new Split<0>({
+      new Rectangle(this->lineWidth,0,{new Line(.5,0,.5,1,this->lineWidth)}),//left line
+      new Rectangle(30,0),
       new Split<1>({
-        new Split<1>({
-          new Rectangle(0,this->captionMargin),
-          new Split<0>({
-            new Rectangle(this->captionMargin,0),
-            new Rectangle(this->captionFontSize*this->functionName.length(),this->captionFontSize*2),
-            new Rectangle(this->captionMargin,0),
-            }),
-          new Rectangle(0,this->captionMargin),
-          }),
-        new Rectangle(0,this->lineWidth),//caption line
-        }),
-      new Rectangle(this->lineWidth,0),//right line
+        new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth)}),//top line
+        new Rectangle(0,30),
+        new Rectangle(4*this->captionFontSize,this->captionFontSize*2,{new Text("AHOJ",8)}),
+        new Rectangle(0,30),
+        new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth)}),//bottom line
       }),
-    new Rectangle(0,this->lineWidth),});//top line
-root->addToNode(this->draw2D,node);
-delete root;
-/*
-   {//output circle
-   size_t px =
-   this->lineWidth+
-   this->margin+
-   inputLength*this->fontSize+
-   this->inputOutputDistance+
-   outputLength*this->fontSize+
-   this->textIndent+
-   this->outputRadius;
-   size_t wb = 
-   this->lineWidth+
-   this->captionMargin+
-   captionLength*this->captionFontSize+
-   this->captionMargin+
-   this->lineWidth;
-   size_t width = glm::max(wa,wb);
-   size_t height;
-   height = 
-   this->lineWidth+
-   this->margin+
-   this->inputNames.size()*inputLineHeight+
-   (this->inputNames.size()==0?(size_t)hasOutput:(this->inputNames.size()-1))*this->inputSpacing+
-   this->margin+
-   this->lineWidth+
-   this->captionMargin+
-   this->captionFontSize*2+
-   this->captionMargin+
-   this->lineWidth;
+      new Rectangle(30,0),
+      new Rectangle(this->lineWidth,0,{new Line(.5,0,.5,1,this->lineWidth)}),//left line
+      });
+  root->addToNode(this->draw2D,node);
+  delete root;
+#endif
 
-   size_t px = this->lineWidth+this->margin+this->inputRadius;
-   size_t py = 
-   this->lineWidth+
-   this->margin+
-   this->fontSize;
-   size_t step = this->fontSize*2+this->inputSpacing;
-
-   for(size_t i=0;i<this->inputNames.size();++i){
-   this->inputCircle.push_back(this->draw2D->createPrimitive(std::make_shared<Circle>(glm::vec2(px,py),this->inputRadius,this->lineWidth,this->lineColor)));
-   py+=step;
-   }
-   for(auto const&x:this->inputCircle)
-   this->draw2D->insertPrimitive(this->node,x);
-   }
-   */
 
 }
 
