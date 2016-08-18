@@ -215,7 +215,7 @@ bool Application::init(int argc,char*argv[]){
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Spline>(glm::vec2(0,0),glm::vec2(100,100),glm::vec2(-100,100),glm::vec2(-200,-300),1,glm::vec4(1,0,0,1))));
   this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Text>("int main(int argc,char*argv[]){return EXIT_SUCCESS;}",8,glm::vec2(-50,-20),glm::vec2(2,1),glm::vec4(1,1,1,1))));
 
-  this->testFce = new gde::Function(this->draw2D,"add",{"valueA","valueB"},"output");
+  this->testFce = new gde::Function(this->draw2D,"addSome",{"valueA","valueB","valueC","val"},"output");
   this->testFce->create();
   this->draw2D->insertNode(nn2,this->testFce->node);
 

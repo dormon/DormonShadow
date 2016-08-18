@@ -12,6 +12,7 @@ set(INCLUDES
   include/Draw2D.h
   include/Draw2DShaders.h
   include/GEDEEditor.h
+  include/UI.h
   )
 
 set(SOURCES
@@ -22,6 +23,7 @@ set(SOURCES
   src/Functions.cpp
   src/Draw2D.cpp
   src/GEDEEditor.cpp
+  src/UI.cpp
   )
 
 include_directories(include /usr/local/include)

@@ -204,7 +204,7 @@ class Viewport{
       glm::mat3 viewMatrix = viewScale*viewRotation*viewTranslate;
 
       for(auto const&x:this->layers){
-        gl.glDisable(GL_DEPTH_TEST);
+        //gl.glDisable(GL_DEPTH_TEST);
         gl.glStencilFunc(GL_ALWAYS,0,0);
         gl.glStencilOp(GL_KEEP,GL_KEEP,GL_ZERO);
         scene->stencilVAO->bind();
@@ -223,7 +223,7 @@ class Viewport{
         scene->stencilVAO->unbind();
         gl.glStencilOp(GL_KEEP,GL_KEEP,GL_KEEP);
         gl.glStencilFunc(GL_EQUAL,1,0xff);
-        gl.glEnable(GL_DEPTH_TEST);
+        //gl.glEnable(GL_DEPTH_TEST);
         auto ii = scene->layers.find(x);
         assert(ii!=scene->layers.end());
         ii->second->draw(viewMatrix*modelMatrix,projectionMatrix,scene);
@@ -602,6 +602,8 @@ void Draw2D::draw(){
   gl.glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
   gl.glEnable(GL_STENCIL_TEST);
   gl.glEnable(GL_BLEND);
+  gl.glDepthFunc(GL_LEQUAL);
+  gl.glDisable(GL_DEPTH_TEST);
   gl.glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 
   if(s->viewports.count(s->rootViewport)!=0){
