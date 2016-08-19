@@ -2,7 +2,7 @@
 
 using namespace ui;
 
-Element::Element(Type const&t,std::vector<Primitive*>const&prims,glm::vec2 const&minSize):type(t),primitives(prims),_minSize(minSize){}
+Element::Element(Type const&t,std::vector<Primitive*>const&prims,glm::vec2 const&minSize):primitives(prims),type(t),_minSize(minSize){}
 
 Element::~Element(){
   for(auto const&x:this->primitives)
@@ -18,60 +18,6 @@ glm::vec2 Element::getPosition(){
   return this->_position;
 }
 
-void Element::addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node){
-  glm::vec2 p = this->getPosition();
-  glm::vec2 s = this->getSize();
-  for(auto const&x:this->primitives){
-    size_t primId = -1;
-    switch(x->type){
-      case Primitive::LINE:
-        primId = draw2D->createPrimitive(std::make_shared<Line>(
-              ((Line*)x)->points[0]*s+p,
-              ((Line*)x)->points[1]*s+p,
-              ((Line*)x)->width,
-              x->color));
-        break;
-      case Primitive::POINT:
-        primId = draw2D->createPrimitive(std::make_shared<Point>(
-              ((Point*)x)->point*s+p,
-              ((Point*)x)->size,
-              x->color));
-        break;
-      case Primitive::CIRCLE:
-        primId = draw2D->createPrimitive(std::make_shared<Circle>(
-              ((Circle*)x)->point*s+p,
-              ((Circle*)x)->size,
-              ((Circle*)x)->width,
-              x->color));
-        break;
-      case Primitive::TRIANGLE:
-        primId = draw2D->createPrimitive(std::make_shared<Triangle>(
-              ((Triangle*)x)->points[0]*s+p,
-              ((Triangle*)x)->points[1]*s+p,
-              ((Triangle*)x)->points[2]*s+p,
-              x->color));
-        break;
-      case Primitive::TEXT:
-        primId = draw2D->createPrimitive(std::make_shared<Text>(
-              ((Text*)x)->data,
-              ((Text*)x)->size,
-              ((Text*)x)->position*s+p,
-              ((Text*)x)->direction,
-              x->color));
-        break;
-      case Primitive::SPLINE:
-        primId = draw2D->createPrimitive(std::make_shared<Spline>(
-              ((Spline*)x)->points[0]*s+p,
-              ((Spline*)x)->points[1]*s+p,
-              ((Spline*)x)->points[2]*s+p,
-              ((Spline*)x)->points[3]*s+p,
-              ((Spline*)x)->width,
-              x->color));
-        break;
-    }
-    draw2D->insertPrimitive(node,primId);
-  }
-}
 
 void Element::_signalParents(){
   Element*p=this->_parent;
@@ -86,49 +32,16 @@ void Element::_signalParents(){
 
 
 
-/*
-template<>
-Split<0>::Split(
-    std::vector<Element*>const&elements,
-    std::vector<Primitive*>const&prims,
-    Spacing const&spacing,
-    glm::vec2 const&minSize):Element((Type)(SPLITX),prims,minSize),_inners(elements),_spacing(spacing){
-  assert(this!=nullptr);
-  assert(elements.size()>0);
-  for(auto const&x:elements)x->_parent = this;
-  this->_signalParents();
-  for(auto const&x:elements){
-    this->_positions[x] = glm::vec2(0.f);
-    this->_sizes[x] = glm::vec2(0.f);
-  }
-}
 
-template<>
-Split<1>::Split(
-    std::vector<Element*>const&elements,
-    std::vector<Primitive*>const&prims,
-    Spacing const&spacing,
-    glm::vec2 const&minSize):Element((Type)(SPLITY),prims,minSize),_inners(elements),_spacing(spacing){
-  assert(this!=nullptr);
-  assert(elements.size()>0);
-  std::reverse(this->_inners.begin(),this->_inners.end());
-  for(auto const&x:elements)x->_parent = this;
-  this->_signalParents();
-  for(auto const&x:elements){
-    this->_positions[x] = glm::vec2(0.f);
-    this->_sizes[x] = glm::vec2(0.f);
-  }
-}
-*/
 Split::Split(
     size_t direction,
     std::vector<Element*>const&elements,
     std::vector<Primitive*>const&prims,
     Spacing const&spacing,
-    glm::vec2 const&minSize):Element((Type)(SPLITX+direction),prims,minSize),X(direction),_inners(elements),_spacing(spacing){
+    glm::vec2 const&minSize):Element((Type)(SPLITX+direction),prims,minSize),_direction(direction),_inners(elements),_spacing(spacing){
   assert(this!=nullptr);
   assert(elements.size()>0);
-  if(X==1)std::reverse(this->_inners.begin(),this->_inners.end());
+  if(this->_direction==1)std::reverse(this->_inners.begin(),this->_inners.end());
   for(auto const&x:elements)x->_parent = this;
   this->_signalParents();
   for(auto const&x:elements){
@@ -146,26 +59,26 @@ glm::vec2 Split::getSize(){
   assert(this!=nullptr);
   if(this->_changedGuts){
     glm::vec2 newSize = glm::vec2(0.f);
-    newSize[1-X] = this->_minSize[1-X];
+    newSize[1-this->_direction] = this->_minSize[1-this->_direction];
     std::vector<float>parts;
     float largestPart = 0;
     for(auto const&x:this->_inners){
       auto is = x->getSize();
-      newSize[1-X] = glm::max(is[1-X],newSize[1-X]);
-      newSize[X]+=is[X];
-      largestPart = glm::max(largestPart,is[X]);
-      parts.push_back(is[X]);
+      newSize[1-this->_direction] = glm::max(is[1-this->_direction],newSize[1-this->_direction]);
+      newSize[this->_direction]+=is[this->_direction];
+      largestPart = glm::max(largestPart,is[this->_direction]);
+      parts.push_back(is[this->_direction]);
     }
     switch(this->_spacing){
       case LEFT:
-        if(newSize[X]<this->_minSize[X])
-          parts.back() += this->_minSize[X]-newSize[X];
+        if(newSize[this->_direction]<this->_minSize[this->_direction])
+          parts.back() += this->_minSize[this->_direction]-newSize[this->_direction];
         break;
       case MIDDLE:
-        if(newSize[X]<this->_minSize[X]){
+        if(newSize[this->_direction]<this->_minSize[this->_direction]){
           float first = parts.at(0);
           float last  = parts.back();
-          float toAdd = this->_minSize[X]-newSize[X];
+          float toAdd = this->_minSize[this->_direction]-newSize[this->_direction];
           if(first+toAdd<last){
             parts.at(0)+=toAdd;
           }else if(last+toAdd<first){
@@ -177,20 +90,19 @@ glm::vec2 Split::getSize(){
         }
         break;
       case RIGHT:
-        if(newSize[X]<this->_minSize[X])
-          parts.at(0) += this->_minSize[X]-newSize[X];
+        if(newSize[this->_direction]<this->_minSize[this->_direction])
+          parts.at(0) += this->_minSize[this->_direction]-newSize[this->_direction];
         break;
       case EQUAL:
-        newSize[X] = largestPart*this->_inners.size();
-        if(newSize[X]<this->_minSize[X])
+        newSize[this->_direction] = largestPart*this->_inners.size();
+        if(newSize[this->_direction]<this->_minSize[this->_direction])
           for(auto&x:parts)
-            x = this->_minSize[X]/this->_inners.size();
+            x = this->_minSize[this->_direction]/this->_inners.size();
         else
           for(auto&x:parts)
             x = largestPart;
         break;
     }
-    //newSize[X] = glm::max(newSize[X],this->_minSize[X]);
     newSize = glm::max(newSize,this->_minSize);
     this->_size = newSize;
 
@@ -198,8 +110,8 @@ glm::vec2 Split::getSize(){
     for(size_t i=0;i<this->_inners.size();++i){
       assert(this->_positions.count(this->_inners.at(i))!=0);
       glm::vec2 newPos = glm::vec2(0.f);
-      newPos[X] = offset;
-      newSize[X] = parts.at(i);
+      newPos[this->_direction] = offset;
+      newSize[this->_direction] = parts.at(i);
       this->_positions.at(this->_inners.at(i))=newPos;
       this->_sizes.at(this->_inners.at(i))=newSize;
       offset+=parts.at(i);
@@ -211,10 +123,17 @@ glm::vec2 Split::getSize(){
   return this->_size;
 }
 
-void Split::addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node){
-  this->Element::addToNode(draw2D,node);
+glm::uvec2 Split::getDimensions()const{
+  if(this->_direction==0)
+    return glm::uvec2(this->_inners.size(),1);
+  else
+    return glm::uvec2(1,this->_inners.size());
+}
+
+void Split::visitor(void(*fce)(Element*,void*),void*data){
+  fce(this,data);
   for(auto const&x:this->_inners)
-    x->addToNode(draw2D,node);
+    x->visitor(fce,data);
 }
 
 glm::vec2 Split::_getPositionOf(Element*e){
@@ -229,18 +148,18 @@ void Split::_setSize(glm::vec2 const&ns){
   assert(this!=nullptr);
   std::vector<float>parts;
   for(auto const&x:this->_inners)
-    parts.push_back(this->_sizes.at(x)[X]);
-  assert(newSize[X]>=this->_minSize[X]);
+    parts.push_back(this->_sizes.at(x)[this->_direction]);
+  assert(newSize[this->_direction]>=this->_minSize[this->_direction]);
   switch(this->_spacing){
     case LEFT:
-      if(newSize[X]>this->_size[X])
-        parts.back() += newSize[X]-this->_size[X];
+      if(newSize[this->_direction]>this->_size[this->_direction])
+        parts.back() += newSize[this->_direction]-this->_size[this->_direction];
       break;
     case MIDDLE:
-      if(newSize[X]>this->_size[X]){
+      if(newSize[this->_direction]>this->_size[this->_direction]){
         float first = parts.at(0);
         float last  = parts.back();
-        float toAdd = newSize[X]-this->_size[X];
+        float toAdd = newSize[this->_direction]-this->_size[this->_direction];
         if(first+toAdd<last){
           parts.at(0)+=toAdd;
         }else if(last+toAdd<first){
@@ -252,12 +171,12 @@ void Split::_setSize(glm::vec2 const&ns){
       }
       break;
     case RIGHT:
-      if(newSize[X]>this->_size[X])
-        parts.at(0) += newSize[X]-this->_size[X];
+      if(newSize[this->_direction]>this->_size[this->_direction])
+        parts.at(0) += newSize[this->_direction]-this->_size[this->_direction];
       break;
     case EQUAL:
       for(auto&x:parts)
-        x = newSize[X]/this->_inners.size();
+        x = newSize[this->_direction]/this->_inners.size();
       break;
   }
   this->_size = newSize;
@@ -266,8 +185,8 @@ void Split::_setSize(glm::vec2 const&ns){
   for(size_t i=0;i<this->_inners.size();++i){
     assert(this->_positions.count(this->_inners.at(i))!=0);
     glm::vec2 newPos = glm::vec2(0.f);
-    newPos[X] = offset;
-    newSize[X] = parts.at(i);
+    newPos[this->_direction] = offset;
+    newSize[this->_direction] = parts.at(i);
     this->_positions.at(this->_inners.at(i))=newPos;
     this->_sizes.at(this->_inners.at(i))=newSize;
     offset+=parts.at(i);
@@ -276,25 +195,6 @@ void Split::_setSize(glm::vec2 const&ns){
   for(auto const&x:this->_inners)
     x->_setSize(this->_sizes.at(x));
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -418,13 +318,16 @@ glm::vec2 Grid::getSize(){
   return this->_size;
 }
 
-void Grid::addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node){
-  this->Element::addToNode(draw2D,node);
-  for(auto const&x:this->_inners)
-    for(auto const&y:x)
-      y->addToNode(draw2D,node);
+glm::uvec2 Grid::getDimensions()const{
+  return glm::uvec2(this->_gridSize);
 }
 
+void Grid::visitor(void(*fce)(Element*,void*),void*data){
+  fce(this,data);
+  for(auto const&x:this->_inners)
+    for(auto const&y:x)
+      y->visitor(fce,data);
+}
 
 glm::vec2 Grid::_getPositionOf(Element*e){
   assert(this!=nullptr);
@@ -517,8 +420,12 @@ glm::vec2 Rectangle::getSize(){
   return this->_size;
 }
 
-void Rectangle::addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node){
-  this->Element::addToNode(draw2D,node);
+glm::uvec2 Rectangle::getDimensions()const{
+  return glm::uvec2(0,0);
+}
+
+void Rectangle::visitor(void(*fce)(Element*,void*),void*data){
+  fce(this,data);
 }
 
 glm::vec2 Rectangle::_getPositionOf(Element*){

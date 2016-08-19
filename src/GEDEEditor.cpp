@@ -1,8 +1,70 @@
 #include<GEDEEditor.h>
 #include<algorithm>
 
-using namespace gde;
 #include<UI.h>
+using namespace gde;
+
+struct AddToNodeData{
+  std::shared_ptr<Draw2D>draw2D;
+  size_t node;
+};
+
+void addToNode(ui::Element*elm,void*d){
+  auto data = (AddToNodeData*)d;
+  glm::vec2 p = elm->getPosition();
+  glm::vec2 s = elm->getSize();
+  for(auto const&x:elm->primitives){
+    size_t primId = -1;
+    switch(x->type){
+      case Primitive::LINE:
+        primId = data->draw2D->createPrimitive(std::make_shared<Line>(
+              ((Line*)x)->points[0]*s+p,
+              ((Line*)x)->points[1]*s+p,
+              ((Line*)x)->width,
+              x->color));
+        break;
+      case Primitive::POINT:
+        primId = data->draw2D->createPrimitive(std::make_shared<Point>(
+              ((Point*)x)->point*s+p,
+              ((Point*)x)->size,
+              x->color));
+        break;
+      case Primitive::CIRCLE:
+        primId = data->draw2D->createPrimitive(std::make_shared<Circle>(
+              ((Circle*)x)->point*s+p,
+              ((Circle*)x)->size,
+              ((Circle*)x)->width,
+              x->color));
+        break;
+      case Primitive::TRIANGLE:
+        primId = data->draw2D->createPrimitive(std::make_shared<Triangle>(
+              ((Triangle*)x)->points[0]*s+p,
+              ((Triangle*)x)->points[1]*s+p,
+              ((Triangle*)x)->points[2]*s+p,
+              x->color));
+        break;
+      case Primitive::TEXT:
+        primId = data->draw2D->createPrimitive(std::make_shared<Text>(
+              ((Text*)x)->data,
+              ((Text*)x)->size,
+              ((Text*)x)->position*s+p,
+              ((Text*)x)->direction,
+              x->color));
+        break;
+      case Primitive::SPLINE:
+        primId = data->draw2D->createPrimitive(std::make_shared<Spline>(
+              ((Spline*)x)->points[0]*s+p,
+              ((Spline*)x)->points[1]*s+p,
+              ((Spline*)x)->points[2]*s+p,
+              ((Spline*)x)->points[3]*s+p,
+              ((Spline*)x)->width,
+              x->color));
+        break;
+    }
+    data->draw2D->insertPrimitive(data->node,primId);
+  }
+}
+
 
 void Function::create(){
   this->inputRadius = 4;
@@ -58,7 +120,10 @@ void Function::create(){
         }),
       new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),});//bottom line
   root->getSize();
-  root->addToNode(this->draw2D,node);
+
+  AddToNodeData data={this->draw2D,node};
+  root->visitor(addToNode,&data);
+
   delete root;
 #endif
 

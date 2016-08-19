@@ -11,11 +11,12 @@ namespace ui{
       virtual ~Element();
       virtual glm::vec2 getSize() = 0;
       glm::vec2 getPosition();
-      virtual void addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node);
+      virtual glm::uvec2 getDimensions()const = 0;
+      virtual void visitor(void(*fce)(Element*,void*),void*data = nullptr) = 0;
+      std::vector<Primitive*>primitives;
     protected:
       enum Type{SPLITX,SPLITY,GRID,RECTANGLE,}type;
       Element(Type const&t,std::vector<Primitive*>const&prims = {},glm::vec2 const&minSize = glm::vec2(0.f));
-      std::vector<Primitive*>primitives;
       glm::vec2 _minSize;
       Element*_parent = nullptr;
       bool _changedGuts = true;
@@ -40,9 +41,10 @@ namespace ui{
           glm::vec2 const&minSize = glm::vec2(0));
       virtual ~Split();
       virtual glm::vec2 getSize()override;
-      virtual void addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node)override;
+      virtual glm::uvec2 getDimensions()const override;
+      virtual void visitor(void(*fce)(Element*,void*),void*data = nullptr)override;
     protected:
-      size_t X = 0;
+      size_t _direction = 0;
       std::vector<Element*>_inners;
       Spacing _spacing;
       std::map<Element const*,glm::vec2>_positions;
@@ -61,7 +63,8 @@ namespace ui{
           glm::vec2 const&minSize = glm::vec2(0));
       virtual ~Grid();
       virtual glm::vec2 getSize()override;
-      virtual void addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node)override;
+      virtual glm::uvec2 getDimensions()const override;
+      virtual void visitor(void(*fce)(Element*,void*),void*data = nullptr)override;
     protected:
       glm::uvec2 _gridSize;
       std::vector<std::vector<Element*>>_inners;
@@ -78,7 +81,8 @@ namespace ui{
       Rectangle(float x=0,float y=0,std::vector<Primitive*>const&prims = {});
       virtual ~Rectangle();
       virtual glm::vec2 getSize()override;
-      virtual void addToNode(std::shared_ptr<Draw2D>const&draw2D,size_t node)override;
+      virtual glm::uvec2 getDimensions()const override;
+      virtual void visitor(void(*fce)(Element*,void*),void*data = nullptr)override;
     protected:
       virtual glm::vec2 _getPositionOf(Element*)override;
       virtual void _setSize(glm::vec2 const&newSize)override;
