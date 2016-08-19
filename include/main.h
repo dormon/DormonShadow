@@ -4,7 +4,6 @@
 #include<geDE/Kernel.h>
 #include<geAd/SDLWindow/SDLWindow.h>
 #include<geGL/geGL.h>
-#include<Draw2D.h>
 #include<GEDEEditor.h>
 
 struct Application{
@@ -14,9 +13,7 @@ struct Application{
   std::shared_ptr<ge::ad::SDLWindow>          window              = nullptr;
   std::shared_ptr<VariableRegisterManipulator>variableManipulator = nullptr;
   std::shared_ptr<ge::de::Statement>          idleScript          = nullptr;
-  //std::shared_ptr<Draw2D>draw2D = nullptr;
   std::shared_ptr<gde::Editor>editor = nullptr;
-  gde::Function*testFce = nullptr;
   ~Application();
   bool init(int argc,char*argv[]);
   static void idle(void*);

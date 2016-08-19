@@ -494,9 +494,9 @@ bool Application::mouseButton(SDL_Event const&event,void*d){
   if(event.button.button == SDL_BUTTON_MIDDLE)b=gde::Editor::MIDDLE;
   if(event.button.button == SDL_BUTTON_RIGHT)b=gde::Editor::RIGHT;
   if(DOWN)
-    app->editor->mouseButtonDown(b,event.button.x,event.button.y);
+    app->editor->mouseButtonDown(b,event.button.x,app->window->getHeight()-event.button.y-1);
   else
-    app->editor->mouseButtonUp(b,event.button.x,event.button.y);
+    app->editor->mouseButtonUp(b,event.button.x,app->window->getHeight()-event.button.y-1);
   return true;
 }
 
@@ -511,7 +511,7 @@ bool Application::mouseMotion(SDL_Event const&event,void*d){
     kernel.variableRegister->getVariable("mouse.xrel")->update(event.motion.xrel);
   if(kernel.variableRegister->hasVariable("mouse.yrel"))
     kernel.variableRegister->getVariable("mouse.yrel")->update(event.motion.yrel);
-  app->editor->mouseMotion(event.motion.xrel,event.motion.yrel,event.motion.x,event.motion.y);
+  app->editor->mouseMotion(event.motion.xrel,-event.motion.yrel,event.motion.x,app->window->getHeight()-event.motion.y-1);
   return true;
 
 }
@@ -539,6 +539,5 @@ bool Application::resize(SDL_Event const&event,void*d){
 
 Application::~Application(){
   this->variableManipulator = nullptr;
-  delete this->testFce;
   TwTerminate();
 }

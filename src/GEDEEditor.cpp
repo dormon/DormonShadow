@@ -9,7 +9,24 @@ struct AddToNodeData{
   size_t node;
 };
 
+class Event{
+  public:
+    enum Type{
+      HOVER,
+    }type;
+    std::function<void(ui::Element*,void*)>callback = nullptr;
+    void*userData = nullptr;
+    Event(Type const&t,std::function<void(ui::Element*,void*)>const&c,void*data = nullptr):type(t),callback(c),userData(data){}
+    void operator()(ui::Element*elem){
+      assert(this->callback!=nullptr);
+      this->callback(elem,this->userData);
+    }
+    ~Event(){}
+};
+
+
 const size_t DATA_PRIMITIVE = 0;
+const size_t DATA_EVENT = 1;
 
 namespace ui{
   template<>inline size_t getTypeId<Line>(){return DATA_PRIMITIVE;}
@@ -18,6 +35,7 @@ namespace ui{
   template<>inline size_t getTypeId<Triangle>(){return DATA_PRIMITIVE;}
   template<>inline size_t getTypeId<Text>(){return DATA_PRIMITIVE;}
   template<>inline size_t getTypeId<Spline>(){return DATA_PRIMITIVE;}
+  template<>inline size_t getTypeId<Event>(){return DATA_EVENT;}
 }
 
 void addToNode(ui::Element*elm,void*d){
@@ -78,6 +96,50 @@ void addToNode(ui::Element*elm,void*d){
   }
 }
 
+class CallHoverData{
+  public:
+    int32_t x;
+    int32_t y;
+};
+
+void callHover(ui::Element*elm,void*d){
+  auto data = (CallHoverData*)d;
+  glm::vec2 p = elm->getPosition();
+  glm::vec2 s = elm->getSize();
+  if(data->x<p.x||data->y<p.y||data->x>s.x+p.x||data->y>s.y+p.y)return;
+  for(auto const&dd:elm->data){
+    if(dd->getId()!=DATA_EVENT)continue;
+    auto event = (Event*)dd->getData();
+    (*event)(elm);
+  }
+}
+
+class Function{
+  public:
+    std::shared_ptr<Draw2D>draw2D;
+    std::string functionName;
+    std::vector<std::string>inputNames;
+    std::string outputName;
+    size_t node;
+    Function(
+        std::shared_ptr<Draw2D> const&draw2D,
+        std::string             const&fce,
+        std::vector<std::string>const&inputs,
+        std::string             const&output){
+      this->draw2D = draw2D;
+      this->functionName = fce;
+      this->inputNames = inputs;
+      this->outputName = output;
+    }
+    ui::Element*root = nullptr;
+    void create();
+    ~Function(){
+      delete root;
+      draw2D->deleteNode(this->node);
+    }
+};
+
+
 
 void Function::create(){
   glm::vec4 backgroundColor = glm::vec4(0,0,0,.8);
@@ -99,7 +161,7 @@ void Function::create(){
   this->node = this->draw2D->createNode();
   using namespace ui;
 
-  auto root = new Split(1,{
+  this->root = new Split(1,{
       new Rectangle(0,lineWidth,{newData<Line>(0,.5,1,.5,lineWidth,lineColor)}),//top line
       new Split(0,{
         new Rectangle(lineWidth,0,{newData<Line>(.5,0,.5,1,lineWidth,lineColor)}),//left line
@@ -143,13 +205,13 @@ void Function::create(){
         }),
         new Rectangle(lineWidth,0,{newData<Line>(.5,0,.5,1,lineWidth,lineColor)}),//right line
       }),
-      new Rectangle(0,lineWidth,{newData<Line>(0,.5,1,.5,lineWidth,lineColor)}),});//bottom line
+      new Rectangle(0,lineWidth,{newData<Line>(0,.5,1,.5,lineWidth,lineColor)}),//bottom line
+  },{newData<Event>(Event::HOVER,[](Element*,void*){std::cerr<<"A";})});
   root->getSize();
 
   AddToNodeData data={this->draw2D,node};
   root->visitor(addToNode,&data);
 
-  delete root;
 }
 
 class gde::EditorImpl{
@@ -162,7 +224,7 @@ class gde::EditorImpl{
       this->draw2d->insertLayer(vv,ll);
       this->draw2d->setLayerNode(ll,nn);
       this->draw2d->setRootViewport(vv);
-      this->testFce = new gde::Function(this->draw2d,"addSome",{"valueA","valueB","valueC","val"},"output");
+      this->testFce = new Function(this->draw2d,"addSome",{"valueA","valueB","valueC","val"},"output");
       this->testFce->create();
       this->draw2d->insertNode(nn,this->testFce->node);
     }
@@ -186,8 +248,16 @@ void Editor::mouseMotion(int32_t xrel,int32_t yrel,size_t x,size_t y){
   (void)x;
   (void)y;
   if(this->_impl->middleDown){
-    this->_impl->draw2d->setCameraPosition(this->_impl->draw2d->getCameraPosition()+glm::vec2(-xrel,yrel));
+    this->_impl->draw2d->setCameraPosition(this->_impl->draw2d->getCameraPosition()+glm::vec2(-xrel,-yrel));
+    return;
   }
+  auto viewMatrix = this->_impl->draw2d->getCameraViewMatrix();
+  auto modelMatrix = this->_impl->draw2d->getNodeTransform(this->_impl->testFce->node);
+  auto newMouseCoord = glm::vec2(glm::inverse(viewMatrix*modelMatrix)*glm::vec3(x,y,1));
+  CallHoverData data;
+  data.x = newMouseCoord.x;
+  data.y = newMouseCoord.y;
+  this->_impl->testFce->root->visitor(callHover,&data);
 }
 
 void Editor::mouseButtonDown(MouseButton b,size_t x,size_t y){

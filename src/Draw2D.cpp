@@ -667,6 +667,23 @@ float      Draw2D::getCameraAngle()const{
   return s->viewports.at(s->rootViewport)->cameraAngle;
 }
 
+
+glm::mat3 Draw2D::getCameraViewMatrix()const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s = this->_impl;
+  if(!this->hasRootViewport()){
+    ge::core::printError(GE_CORE_FCENAME,"there is no rootViewport");
+    return glm::mat3(1.f);
+  }
+  assert(s->viewports.at(s->rootViewport)!=nullptr);
+  auto v = s->viewports.at(s->rootViewport);
+  auto viewTranslate = Draw2D::translate(-v->cameraPosition);
+  auto viewRotation = Draw2D::rotate(v->cameraAngle);
+  auto viewScale = Draw2D::scale(v->cameraScale);
+  return viewRotation*viewTranslate*viewScale;
+}
+
 void Draw2D::setViewportSize(glm::uvec2 const&size){
   assert(this!=nullptr);
   assert(this->_impl!=nullptr);
@@ -975,6 +992,34 @@ glm::mat3 Draw2D::getNodeMatrix(size_t node)const{
   }
   assert(s->nodes.at(node)!=nullptr);
   return s->nodes.at(node)->mat;
+}
+
+glm::mat3 Draw2D::getNodeTransform(size_t node)const{
+  assert(this!=nullptr);
+  assert(this->_impl!=nullptr);
+  auto*s=this->_impl;
+  if(!this->isNode(node)){
+    ge::core::printError(GE_CORE_FCENAME,"there is no such node",node);
+    return glm::mat3(1.f);
+  }
+  assert(s->nodes.at(node)!=nullptr);
+  glm::mat3 fullTransform = glm::mat3(1.f);
+  auto n=node;
+  do{
+    fullTransform*=s->nodes.at(n)->mat;
+    if(s->nodeParentNodes.count(n)!=0){
+      n=*s->nodeParentNodes.at(n).begin();
+      continue;
+    }
+    if(s->nodeParentLayers.count(n)!=0){
+      auto l=*s->nodeParentLayers.at(n).begin();
+      if(s->layerParents.count(l)==0)break;
+      auto v=*s->layerParents.at(l).begin();
+      if(s->viewportParents.count(v)==0)break;
+      n=*s->viewportParents.at(v).begin();
+    }
+  }while(true);
+  return fullTransform;
 }
 
 void Draw2D::setNodeMatrix(size_t node,glm::mat3 const&mat){

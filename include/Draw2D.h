@@ -122,6 +122,7 @@ class Draw2D{
     glm::vec2  getCameraPosition()const;
     float      getCameraScale()const;
     float      getCameraAngle()const;
+    glm::mat3  getCameraViewMatrix()const;
     void setViewportSize(glm::uvec2 const&size);
     void setCameraPosition(glm::vec2 const&cameraPosition = glm::vec2(0.f));
     void setCameraScale(float cameraScale = 1.f);
@@ -164,6 +165,7 @@ class Draw2D{
     size_t    getNofPrimitives(size_t node)const;
     size_t    getPrimitive    (size_t node,size_t i)const;
     glm::mat3 getNodeMatrix   (size_t node)const;
+    glm::mat3 getNodeTransform(size_t node)const;
     void      setNodeMatrix   (size_t node,glm::mat3 const&mat);
     void      insertViewport  (size_t node,size_t viewport);
     void      insertNode      (size_t node,size_t childNode);
