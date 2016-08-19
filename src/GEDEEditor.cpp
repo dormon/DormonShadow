@@ -9,11 +9,15 @@ struct AddToNodeData{
   size_t node;
 };
 
+const size_t DATA_PRIMITIVE = 0;
+
 void addToNode(ui::Element*elm,void*d){
   auto data = (AddToNodeData*)d;
   glm::vec2 p = elm->getPosition();
   glm::vec2 s = elm->getSize();
-  for(auto const&x:elm->primitives){
+  for(auto const&dd:elm->data){
+    if(dd->getId()!=DATA_PRIMITIVE)continue;
+    auto x = (Primitive*)dd->getData();
     size_t primId = -1;
     switch(x->type){
       case Primitive::LINE:
@@ -75,20 +79,20 @@ void Function::create(){
 
 #if 1
   auto root = new Split(1,{
-      new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),//top line
+      new Rectangle(0,this->lineWidth,{newData<Line>(0,0,.5,1,.5,this->lineWidth,this->lineColor)}),//top line
       new Split(0,{
-        new Rectangle(this->lineWidth,0,{new Line(.5,0,.5,1,this->lineWidth,this->lineColor)}),//left line
+        new Rectangle(this->lineWidth,0,{newData<Line>(0,.5,0,.5,1,this->lineWidth,this->lineColor)}),//left line
         new Split(1,{
           new Split(1,{
             new Rectangle(0,this->captionMargin),
             new Split(0,{
               new Rectangle(this->captionMargin,0),
-              new Rectangle(this->captionFontSize*this->functionName.length(),this->captionFontSize*2,{new Text(this->functionName,this->captionFontSize,this->captionColor)}),
+              new Rectangle(this->captionFontSize*this->functionName.length(),this->captionFontSize*2,{newData<Text>(0,this->functionName,this->captionFontSize,this->captionColor)}),
               new Rectangle(this->captionMargin,0),
               }),
             new Rectangle(0,this->captionMargin),
-            },{new Triangle(0,0,1,0,1,1,this->captionBackgrounColor),new Triangle(0,0,1,1,0,1,this->captionBackgrounColor)}),
-          new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),//caption line
+            },{newData<Triangle>(0,0,0,1,0,1,1,this->captionBackgrounColor),newData<Triangle>(0,0,0,1,1,0,1,this->captionBackgrounColor)}),
+          new Rectangle(0,this->lineWidth,{newData<Line>(0,0,.5,1,.5,this->lineWidth,this->lineColor)}),//caption line
           new Split(0,{
             new Rectangle(this->margin,0),
             new Split(1,{
@@ -97,28 +101,28 @@ void Function::create(){
                 new Split(1,//inputs
                   repear1D(this->inputNames.size(),[this](size_t i)->Element*{
                     return new Split(0,{
-                      new Rectangle(this->inputRadius*2,0,{new Circle(.5,.5,this->inputRadius,this->lineWidth)}),
+                      new Rectangle(this->inputRadius*2,0,{newData<Circle>(0,.5,.5,this->inputRadius,this->lineWidth)}),
                       new Rectangle(this->textIndent,0),
-                      new Rectangle(this->fontSize*this->inputNames[i].length(),this->fontSize*2,{new Text(this->inputNames[i],this->fontSize,this->captionColor)})
+                      new Rectangle(this->fontSize*this->inputNames[i].length(),this->fontSize*2,{newData<Text>(0,this->inputNames[i],this->fontSize,this->captionColor)})
                       });
                     })
                   ),
                 new Rectangle(this->inputOutputDistance,0),
                 new Split(0,{
-                  new Rectangle(this->fontSize*this->outputName.length(),this->fontSize*2,{new Text(this->outputName,this->fontSize,this->captionColor,glm::vec2(0,.5))}),
+                  new Rectangle(this->fontSize*this->outputName.length(),this->fontSize*2,{newData<Text>(0,this->outputName,this->fontSize,this->captionColor,glm::vec2(0,.5))}),
                   new Rectangle(this->textIndent,0),
-                  new Rectangle(this->outputRadius*2,0,{new Circle(.5,.5,this->outputRadius,this->lineWidth,this->lineColor)}),
+                  new Rectangle(this->outputRadius*2,0,{newData<Circle>(0,.5,.5,this->outputRadius,this->lineWidth,this->lineColor)}),
                   }),
                 //output
                 }),
               new Rectangle(0,this->margin),
               }),
             new Rectangle(this->margin,0),
-            },{new Triangle(0,0,1,0,1,1,this->backgroundColor),new Triangle(0,0,1,1,0,1,this->backgroundColor)}),
+            },{newData<Triangle>(0,0,0,1,0,1,1,this->backgroundColor),newData<Triangle>(0,0,0,1,1,0,1,this->backgroundColor)}),
           }),
-        new Rectangle(this->lineWidth,0,{new Line(.5,0,.5,1,this->lineWidth,this->lineColor)}),//right line
+        new Rectangle(this->lineWidth,0,{newData<Line>(0,.5,0,.5,1,this->lineWidth,this->lineColor)}),//right line
         }),
-      new Rectangle(0,this->lineWidth,{new Line(0,.5,1,.5,this->lineWidth,this->lineColor)}),});//bottom line
+      new Rectangle(0,this->lineWidth,{newData<Line>(0,0,.5,1,.5,this->lineWidth,this->lineColor)}),});//bottom line
   root->getSize();
 
   AddToNodeData data={this->draw2D,node};

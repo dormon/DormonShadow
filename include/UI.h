@@ -1,9 +1,32 @@
 #pragma once
 
-#include<Draw2D.h>
+#include<map>
+#include<functional>
 #include<algorithm>
+#include<glm/glm.hpp>
+#include<glm/gtc/matrix_transform.hpp>
+#include<glm/gtc/type_ptr.hpp>
+#include<glm/gtc/matrix_access.hpp>
 
 namespace ui{
+  class Data{
+    public:
+      Data(size_t id,void*data,void(*deleter)(void*) = nullptr):_id(id),_data(data),_deleter(deleter){}
+      ~Data(){assert(this!=nullptr);assert(_deleter!=nullptr);this->_deleter(this->_data);}
+      void*getData()const{assert(this!=nullptr);return this->_data;}
+      size_t getId()const{assert(this!=nullptr);return this->_id;}
+    protected:
+      size_t _id;
+      void*_data;
+      void(*_deleter)(void*);
+  };
+  template<typename CLASS,typename...ARGS>
+  Data*newData(size_t id,ARGS...args){
+    uint8_t*d = new uint8_t[sizeof(CLASS)];
+    new(d)CLASS(args...);
+    return new Data(id,d,[](void*d){((CLASS*)d)->~CLASS();delete[](uint8_t*)d;});
+  }
+
   class Split;
   class Grid;
   class Element{
@@ -13,10 +36,10 @@ namespace ui{
       glm::vec2 getPosition();
       virtual glm::uvec2 getDimensions()const = 0;
       virtual void visitor(void(*fce)(Element*,void*),void*data = nullptr) = 0;
-      std::vector<Primitive*>primitives;
+      std::vector<Data*>data;
     protected:
       enum Type{SPLITX,SPLITY,GRID,RECTANGLE,}type;
-      Element(Type const&t,std::vector<Primitive*>const&prims = {},glm::vec2 const&minSize = glm::vec2(0.f));
+      Element(Type const&t,std::vector<Data*>const&prims = {},glm::vec2 const&minSize = glm::vec2(0.f));
       glm::vec2 _minSize;
       Element*_parent = nullptr;
       bool _changedGuts = true;
@@ -36,7 +59,7 @@ namespace ui{
       Split(
           size_t direction,
           std::vector<Element*>const&elements,
-          std::vector<Primitive*>const&prims = {},
+          std::vector<Data*>const&prims = {},
           Spacing const&spacing = LEFT,
           glm::vec2 const&minSize = glm::vec2(0));
       virtual ~Split();
@@ -57,7 +80,7 @@ namespace ui{
     public:
       Grid(
           std::vector<std::vector<Element*>>const&elements,
-          std::vector<Primitive*>const&prims,
+          std::vector<Data*>const&prims,
           Spacing const&spacingX = LEFT,
           Spacing const&spacingY = LEFT,
           glm::vec2 const&minSize = glm::vec2(0));
@@ -77,8 +100,8 @@ namespace ui{
 
   class Rectangle: public Element{
     public:
-      Rectangle(std::vector<Primitive*>const&prims = {},glm::vec2 const&minSize = glm::vec2(0.f));
-      Rectangle(float x=0,float y=0,std::vector<Primitive*>const&prims = {});
+      Rectangle(std::vector<Data*>const&prims = {},glm::vec2 const&minSize = glm::vec2(0.f));
+      Rectangle(float x=0,float y=0,std::vector<Data*>const&prims = {});
       virtual ~Rectangle();
       virtual glm::vec2 getSize()override;
       virtual glm::uvec2 getDimensions()const override;
