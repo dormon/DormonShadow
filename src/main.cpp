@@ -172,6 +172,7 @@ bool Application::init(int argc,char*argv[]){
   this->window->setEventCallback(SDL_MOUSEBUTTONDOWN,Application::mouseButton<true>,this);
   this->window->setEventCallback(SDL_MOUSEBUTTONUP  ,Application::mouseButton<false>,this);
   this->window->setEventCallback(SDL_MOUSEMOTION    ,Application::mouseMotion,this);
+  this->window->setEventCallback(SDL_MOUSEWHEEL     ,Application::mouseWheel,this);
   this->window->setWindowEventCallback(SDL_WINDOWEVENT_RESIZED,Application::resize,this);
   this->mainLoop->addWindow("primaryWindow",this->window);
 
@@ -189,6 +190,8 @@ bool Application::init(int argc,char*argv[]){
   TwInit(TW_OPENGL_CORE,nullptr);
   TwWindowSize(this->window->getWidth(),this->window->getHeight());
 
+  this->editor = std::make_shared<gde::Editor>(*this->gl,glm::uvec2(this->window->getWidth(),this->window->getHeight()));
+  /*
   this->draw2D = std::make_shared<Draw2D>(*this->gl);
   auto vv=this->draw2D->createViewport(glm::uvec2(this->window->getWidth(),this->window->getHeight()));
   auto ll=this->draw2D->createLayer();
@@ -218,6 +221,7 @@ bool Application::init(int argc,char*argv[]){
   this->testFce = new gde::Function(this->draw2D,"addSome",{"valueA","valueB","valueC","val"},"output");
   this->testFce->create();
   this->draw2D->insertNode(nn2,this->testFce->node);
+  */
 
   kernel.typeRegister->addType<float*>();
   kernel.addAtomicType(
@@ -456,11 +460,13 @@ void Application::idle(void*d){
   auto app = (Application*)d;
   //(*app->idleScript)();
   //TwDraw();
-  app->draw2D->draw();
+  app->editor->draw();
+  //app->draw2D->draw();
   app->window->swap();
 }
 
 bool Application::eventHandler(SDL_Event const&event,void*){
+  return false;
   bool handledByAnt = TwEventSDL(&event,SDL_MAJOR_VERSION,SDL_MINOR_VERSION);
   if(handledByAnt)return true;
   return false;
@@ -483,6 +489,14 @@ bool Application::mouseButton(SDL_Event const&event,void*d){
   auto &kernel = app->kernel;
   if(kernel.variableRegister->hasVariable(name))
     kernel.variableRegister->getVariable(name)->update(DOWN);
+  gde::Editor::MouseButton b;
+  if(event.button.button == SDL_BUTTON_LEFT)b=gde::Editor::LEFT;
+  if(event.button.button == SDL_BUTTON_MIDDLE)b=gde::Editor::MIDDLE;
+  if(event.button.button == SDL_BUTTON_RIGHT)b=gde::Editor::RIGHT;
+  if(DOWN)
+    app->editor->mouseButtonDown(b,event.button.x,event.button.y);
+  else
+    app->editor->mouseButtonUp(b,event.button.x,event.button.y);
   return true;
 }
 
@@ -497,6 +511,16 @@ bool Application::mouseMotion(SDL_Event const&event,void*d){
     kernel.variableRegister->getVariable("mouse.xrel")->update(event.motion.xrel);
   if(kernel.variableRegister->hasVariable("mouse.yrel"))
     kernel.variableRegister->getVariable("mouse.yrel")->update(event.motion.yrel);
+  app->editor->mouseMotion(event.motion.xrel,event.motion.yrel,event.motion.x,event.motion.y);
+  return true;
+
+}
+
+bool Application::mouseWheel(SDL_Event const&event,void*d){
+  auto app = (Application*)d;
+  //auto &kernel = app->kernel;
+  //TODO ge::dea
+  app->editor->mouseWheel(event.wheel.x,event.wheel.y);
   return true;
 
 }
@@ -507,7 +531,8 @@ bool Application::resize(SDL_Event const&event,void*d){
   kernel.variable("window.width" )->update((uint32_t)event.window.data1);
   kernel.variable("window.height")->update((uint32_t)event.window.data2);
 
-  app->draw2D->setViewportSize(glm::uvec2(event.window.data1,event.window.data2));
+  app->editor->resize(event.window.data1,event.window.data2);
+  //app->draw2D->setViewportSize(glm::uvec2(event.window.data1,event.window.data2));
 
   return true;
 }

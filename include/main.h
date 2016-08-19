@@ -14,7 +14,8 @@ struct Application{
   std::shared_ptr<ge::ad::SDLWindow>          window              = nullptr;
   std::shared_ptr<VariableRegisterManipulator>variableManipulator = nullptr;
   std::shared_ptr<ge::de::Statement>          idleScript          = nullptr;
-  std::shared_ptr<Draw2D>draw2D = nullptr;
+  //std::shared_ptr<Draw2D>draw2D = nullptr;
+  std::shared_ptr<gde::Editor>editor = nullptr;
   gde::Function*testFce = nullptr;
   ~Application();
   bool init(int argc,char*argv[]);
@@ -25,6 +26,7 @@ struct Application{
   template<bool DOWN>
     static bool mouseButton(SDL_Event const&,void*);
   static bool mouseMotion(SDL_Event const&,void*);
+  static bool mouseWheel(SDL_Event const&,void*);
   static bool resize(SDL_Event const&,void*);
 };
 

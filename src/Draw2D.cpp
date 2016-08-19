@@ -201,7 +201,7 @@ class Viewport{
       auto viewTranslate = Draw2D::translate(-cameraPosition);
       auto viewRotation = Draw2D::rotate(this->cameraAngle);
       auto viewScale = Draw2D::scale(cameraScale);
-      glm::mat3 viewMatrix = viewScale*viewRotation*viewTranslate;
+      glm::mat3 viewMatrix = viewRotation*viewTranslate*viewScale;
 
       for(auto const&x:this->layers){
         //gl.glDisable(GL_DEPTH_TEST);
