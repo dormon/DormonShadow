@@ -9,6 +9,8 @@
 #include<glm/gtc/matrix_access.hpp>
 
 namespace ui{
+  template<typename T>
+    size_t getTypeId();
   class Data{
     public:
       Data(size_t id,void*data,void(*deleter)(void*) = nullptr):_id(id),_data(data),_deleter(deleter){}
@@ -21,10 +23,10 @@ namespace ui{
       void(*_deleter)(void*);
   };
   template<typename CLASS,typename...ARGS>
-  Data*newData(size_t id,ARGS...args){
+  Data*newData(ARGS...args){
     uint8_t*d = new uint8_t[sizeof(CLASS)];
     new(d)CLASS(args...);
-    return new Data(id,d,[](void*d){((CLASS*)d)->~CLASS();delete[](uint8_t*)d;});
+    return new Data(getTypeId<CLASS>(),d,[](void*d){((CLASS*)d)->~CLASS();delete[](uint8_t*)d;});
   }
 
   class Split;
