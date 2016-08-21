@@ -2,11 +2,12 @@
 
 using namespace ui;
 
-Element::Element(Type const&t,std::vector<Data*>const&prims,glm::vec2 const&minSize):data(prims),type(t),_minSize(minSize){}
+Element::Element(Type const&t,std::vector<NewData>const&prims,glm::vec2 const&minSize):type(t),_minSize(minSize){
+  for(auto const&x:prims)
+    this->data.addValue(x);
+}
 
 Element::~Element(){
-  for(auto const&x:this->data)
-    delete x;
 }
 
 
@@ -36,7 +37,7 @@ void Element::_signalParents(){
 Split::Split(
     size_t direction,
     std::vector<Element*>const&elements,
-    std::vector<Data*>const&prims,
+    std::vector<NewData>const&prims,
     Spacing const&spacing,
     glm::vec2 const&minSize):Element((Type)(SPLITX+direction),prims,minSize),_direction(direction),_inners(elements),_spacing(spacing){
   assert(this!=nullptr);
@@ -203,7 +204,7 @@ void Split::_setSize(glm::vec2 const&ns){
 
 Grid::Grid(
     std::vector<std::vector<Element*>>const&elements,
-    std::vector<Data*>const&prims,
+    std::vector<NewData>const&prims,
     Spacing const&spacingX,
     Spacing const&spacingY,
     glm::vec2 const&minSize):Element(GRID,prims,minSize),_inners(elements){
@@ -406,12 +407,12 @@ void Grid::_setSize(glm::vec2 const&ns){
 
 }
 
-Rectangle::Rectangle(std::vector<Data*>const&prims,glm::vec2 const&minSize):Element(RECTANGLE,prims,minSize){
+Rectangle::Rectangle(std::vector<NewData>const&prims,glm::vec2 const&minSize):Element(RECTANGLE,prims,minSize){
   assert(this!=nullptr);
   this->_size = minSize;
 }
 
-Rectangle::Rectangle(float x,float y,std::vector<Data*>const&prims):Rectangle(prims,glm::vec2(x,y)){}
+Rectangle::Rectangle(float x,float y,std::vector<NewData>const&prims):Rectangle(prims,glm::vec2(x,y)){}
 
 Rectangle::~Rectangle(){}
 

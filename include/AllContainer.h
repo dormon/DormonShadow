@@ -10,8 +10,9 @@
 
 class NewData{
   public:
+    NewData():type(typeid(void)){}
     template<typename CLASS,typename...ARGS>
-      NewData(ARGS...args){
+      void create(ARGS...args){
         assert(this!=nullptr);
         this->destructor = [](void*ptr){((CLASS*)ptr)->~CLASS();delete[](uint8_t*)ptr;};
         this->data = new uint8_t[sizeof(CLASS)];
@@ -23,6 +24,15 @@ class NewData{
     std::function<void(void*)>destructor;
     std::type_index type;
 };
+
+
+template<typename CLASS,typename...ARGS>
+NewData newData(ARGS...args){
+  NewData a{};
+  a.create<CLASS,ARGS...>(args...);
+  return a;
+  //return NewData<CLASS,ARGS...>(args...);
+}
 
 class AllContainer{
   public:

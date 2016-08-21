@@ -76,8 +76,8 @@ void Edit::draw(){
   if(v==nullptr)return;
 
   auto viewProjection = glm::mat3(1.f);
-  viewProjection[0].x = 2./(float)v->size.x;
-  viewProjection[1].y = 2./(float)v->size.y;
+  viewProjection[0].x = 2./(float)v->cameraSize.x;
+  viewProjection[1].y = 2./(float)v->cameraSize.y;
   viewProjection[2] = glm::vec3(-1,-1,1);
 
   this->drawViewport(v,glm::mat3(1.f),viewProjection);
@@ -89,9 +89,9 @@ void Edit::draw(){
 void Edit::drawViewport(Viewport2d*viewport,glm::mat3 const&model,glm::mat3 const&projection){
   glm::vec3 wp[4];
   wp[0]=model*glm::vec3(0.f,0.f,1.f);
-  wp[1]=model*glm::vec3(glm::vec2(viewport->size.x,0.f   ),1.f);
-  wp[2]=model*glm::vec3(glm::vec2(0.f   ,viewport->size.y),1.f);
-  wp[3]=model*glm::vec3(glm::vec2(viewport->size.x,viewport->size.y),1.f);
+  wp[1]=model*glm::vec3(glm::vec2(viewport->cameraSize.x,0.f   ),1.f);
+  wp[2]=model*glm::vec3(glm::vec2(0.f   ,viewport->cameraSize.y),1.f);
+  wp[3]=model*glm::vec3(glm::vec2(viewport->cameraSize.x,viewport->cameraSize.y),1.f);
   glm::vec2 op=glm::vec2(
       glm::min(glm::min(wp[0].x,wp[1].x),glm::min(wp[2].x,wp[3].x)),
       glm::min(glm::min(wp[0].y,wp[1].y),glm::min(wp[2].y,wp[3].y)));
@@ -108,6 +108,7 @@ void Edit::drawViewport(Viewport2d*viewport,glm::mat3 const&model,glm::mat3 cons
     //gl.glDisable(GL_DEPTH_TEST);
     gl.glStencilFunc(GL_ALWAYS,0,0);
     gl.glStencilOp(GL_KEEP,GL_KEEP,GL_ZERO);
+    gl.glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);
     this->stencilVAO->bind();
     this->stencilProgram->use();
     this->stencilProgram->set2f("a",-1,-1);
@@ -125,6 +126,7 @@ void Edit::drawViewport(Viewport2d*viewport,glm::mat3 const&model,glm::mat3 cons
     gl.glStencilOp(GL_KEEP,GL_KEEP,GL_KEEP);
     gl.glStencilFunc(GL_EQUAL,1,0xff);
     //gl.glEnable(GL_DEPTH_TEST);
+    gl.glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
     this->drawLayer(x,viewMatrix*model,projection);
   }
 }
@@ -353,12 +355,13 @@ void Edit::drawNode(Node2d*node,glm::mat3 const&model,glm::mat3 const&projection
   this->gl.glDrawArrays(GL_POINTS,0,rd->nofPoints);
   rd->pointVAO->unbind();
 
+  
   this->circleProgram->use();
   this->circleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   rd->circleVAO->bind();
   this->gl.glDrawArrays(GL_POINTS,0,rd->nofCircles);
   rd->circleVAO->unbind();
-
+  
   this->triangleProgram->use();
   this->triangleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   rd->triangleVAO->bind();
@@ -389,5 +392,48 @@ void Edit::drawNode(Node2d*node,glm::mat3 const&model,glm::mat3 const&projection
     this->drawNode((Node2d*)x,newModelMatrix,projection);
   }
  
+}
+
+void Edit::mouseMotion(int32_t xrel,int32_t yrel,size_t x,size_t y){
+  if(!this->currentViewport)return;
+  this->mouseMotionViewport(this->currentViewport,glm::vec2(xrel,yrel),glm::vec2(x,y));
+}
+
+bool Edit::mouseMotionViewport(Viewport2d*viewport,glm::vec2 const&diff,glm::vec2 const&pos){
+  if(!viewport)return false;
+  if(pos.x<0.f||pos.y<0.f||pos.x>viewport->cameraSize.x||pos.y>viewport->cameraSize.y)return false;
+  for(int32_t i=viewport->size()-1;i>=0;--i)
+    if(this->mouseMotionLayer(viewport->at(i),diff,pos))return true;
+  return false;
+}
+
+bool Edit::mouseMotionLayer(Layer*layer,glm::vec2 const&diff,glm::vec2 const&pos){
+  if(!layer)return false;
+  if(!layer->root)return false;
+  return this->mouseMotionNode((Node2d*)layer->root,diff,pos);
+}
+
+bool Edit::mouseMotionNode(Node2d*node,glm::vec2 const&diff,glm::vec2 const&pos){
+  auto newPos = glm::vec2(node->mat*glm::vec3(pos,1.f));
+  auto newDiff = glm::vec2(node->mat*glm::vec3(diff,1.f));
+  if(node->hasValues<MouseMotionEvent>()){
+    auto v = node->getValues<MouseMotionEvent>();
+    for(auto const&x:v){
+      auto vv = (MouseMotionEvent*)x;
+      if(newPos.x<vv->pos.x||newPos.y<vv->pos.y||newPos.x>vv->pos.x+vv->size.y||newPos.y>vv->pos.y+vv->size.y)continue;
+      (*vv)(node,newDiff,newPos);
+      return true;
+    }
+  }
+  if(node->hasValues<Viewport>()){
+    auto v = node->getValues<Viewport>();
+    for(auto const&x:v){
+      auto vv = (Viewport2d*)x;
+      if(this->mouseMotionViewport(vv,newDiff,newPos))return true;
+    }
+  }
+  for(auto const&x:*node)
+    if(this->mouseMotionNode((Node2d*)x,newDiff,newPos))return true;
+  return false;
 }
 

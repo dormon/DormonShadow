@@ -10,7 +10,7 @@
 
 class Viewport2d: public Viewport{
   public:
-    glm::vec2 size;
+    glm::vec2 cameraSize;
     glm::vec2 cameraPosition = glm::vec2(0.f);
     float cameraScale = 1.f;
     float cameraAngle = 0.f;
@@ -18,7 +18,7 @@ class Viewport2d: public Viewport{
     virtual~Viewport2d();
 };
 
-inline Viewport2d::Viewport2d(glm::vec2 const&s):Viewport(),size(s){}
+inline Viewport2d::Viewport2d(glm::vec2 const&s):Viewport(),cameraSize(s){}
 
 inline Viewport2d::~Viewport2d(){}
 
