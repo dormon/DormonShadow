@@ -8,6 +8,21 @@
 #include<typeinfo>
 #include<typeindex>
 
+class NewData{
+  public:
+    template<typename CLASS,typename...ARGS>
+      NewData(ARGS...args){
+        assert(this!=nullptr);
+        this->destructor = [](void*ptr){((CLASS*)ptr)->~CLASS();delete[](uint8_t*)ptr;};
+        this->data = new uint8_t[sizeof(CLASS)];
+        assert(this->data!=nullptr);
+        new(this->data)CLASS(args...);
+        this->type = typeid(CLASS);
+      }
+    void*data;
+    std::function<void(void*)>destructor;
+    std::type_index type;
+};
 
 class AllContainer{
   public:
@@ -65,6 +80,20 @@ class AllContainer{
       size_t index = this->_data.at(typeid(CLASS)).size();
       this->_data.at(typeid(CLASS)).push_back(newData);
       return index;
+    }
+    size_t addValue(std::type_index const&type,void*data,std::function<void(void*)>const&destructor){
+      assert(this!=nullptr);
+      if(this->_id2destructor.count(type)==0)
+        this->_id2destructor[type] = destructor;
+      if(this->_data.count(type)==0)
+        this->_data[type] = std::vector<void*>();
+      size_t index = this->_data.at(type).size();
+      this->_data.at(type).push_back(data);
+      return index;
+    }
+    size_t addValue(NewData const&data){
+      assert(this!=nullptr);
+      return this->addValue(data.type,data.data,data.destructor);
     }
     template<typename CLASS>
     void removeValue(size_t index){
