@@ -4,28 +4,13 @@
 #include<Font.h>
 #include<algorithm>
 
+#include<CreateFontTexture.h>
+
 using namespace ge::gl;
 
-std::shared_ptr<ge::gl::Texture>createFontTexture(){
-  const uint32_t w=ge::res::font::width;
-  const uint32_t h=ge::res::font::height;
-  uint8_t bytes[w*h];
-  auto result = std::make_shared<ge::gl::Texture>(GL_TEXTURE_2D,GL_R8,0,w,h);
-  for(uint32_t i=0;i<w*h/8;++i)
-    for(size_t k=0;k<8;++k)
-      bytes[i*8+k]=255*((ge::res::font::data[i]>>k)&0x1);
-  result->setData2D(bytes,GL_RED,GL_UNSIGNED_BYTE,0,0,0,w,h,w);
-  result->generateMipmap();
-  result->texParameteri(GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);
-  result->texParameteri(GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-  result->texParameteri(GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-  result->texParameteri(GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-  return result;
-}
-
-class Viewport;
-class Layer;
-class Node;
+class Viewport2;
+class Layer2;
+class Node2;
 class Primitive;
 
 class Scene2D{
@@ -41,9 +26,9 @@ class Scene2D{
     std::shared_ptr<Program>stencilProgram;
     std::shared_ptr<VertexArray>stencilVAO;
 
-    std::map<size_t,std::shared_ptr<Viewport>>viewports;
-    std::map<size_t,std::shared_ptr<Layer>>layers;
-    std::map<size_t,std::shared_ptr<Node>>nodes;
+    std::map<size_t,std::shared_ptr<Viewport2>>viewports;
+    std::map<size_t,std::shared_ptr<Layer2>>layers;
+    std::map<size_t,std::shared_ptr<Node2>>nodes;
     std::map<size_t,std::shared_ptr<Primitive>>primitives;
     size_t viewportCounter = 0;
     size_t layerCounter = 0;
@@ -126,7 +111,7 @@ class Scene2D{
     }
 };
 
-class Node{
+class Node2{
   public:
     glm::mat3 mat;
     std::vector<size_t>childs;
@@ -152,16 +137,16 @@ class Node{
     size_t nofCharacters;
     bool changed = true;
     void draw(glm::mat3 const&modelMatrix,glm::mat3 const&projectionMatrix,Scene2D const*scene);
-    Node(glm::mat3 const&mat = glm::mat3(1.f)){
+    Node2(glm::mat3 const&mat = glm::mat3(1.f)){
       this->mat = mat;
     }
 };
 
-class Layer{
+class Layer2{
   public:
-    Layer(){}
-    ~Layer(){}
-    size_t root;
+    Layer2(){}
+    ~Layer2(){}
+    size_t root = -1;
     void draw(glm::mat3 const&modelMatrix,glm::mat3 const&projectionMatrix,Scene2D const*scene){
       auto ii = scene->nodes.find(root);
       if(ii==scene->nodes.end())return;
@@ -169,14 +154,14 @@ class Layer{
     }
 };
 
-class Viewport{
+class Viewport2{
   public:
     glm::uvec2 size;
     glm::vec2 cameraPosition;
     float cameraScale;
     float cameraAngle;
     std::vector<size_t>layers;
-    Viewport(glm::uvec2 const&size,glm::vec2 const&cameraPosition,float cameraScale,float cameraAngle){
+    Viewport2(glm::uvec2 const&size,glm::vec2 const&cameraPosition,float cameraScale,float cameraAngle){
       assert(this!=nullptr);
       this->size = size;
       this->cameraPosition = cameraPosition;
@@ -243,7 +228,7 @@ class Viewport{
 
 
 
-void Node::draw(glm::mat3 const&modelMatrix,glm::mat3 const&projectionMatrix,Scene2D const*scene){
+void Node2::draw(glm::mat3 const&modelMatrix,glm::mat3 const&projectionMatrix,Scene2D const*scene){
   glm::mat3 newModelMatrix = this->mat*modelMatrix;
   glm::mat3 matrix = projectionMatrix*newModelMatrix;
   if(changed){
@@ -1137,7 +1122,7 @@ size_t Draw2D::createLayer(){
   assert(this->_impl!=nullptr);
   auto*s=this->_impl;
   while(this->isLayer(s->layerCounter))s->layerCounter++;
-  s->layers[s->layerCounter] = std::make_shared<Layer>();
+  s->layers[s->layerCounter] = std::make_shared<Layer2>();
   return s->layerCounter++;
 }
 
@@ -1146,7 +1131,7 @@ size_t Draw2D::createViewport(glm::uvec2 const&size,glm::vec2 const&cameraPositi
   assert(this->_impl!=nullptr);
   auto*s=this->_impl;
   while(this->isViewport(s->viewportCounter))s->viewportCounter++;
-  s->viewports[s->viewportCounter] = std::make_shared<Viewport>(size,cameraPosition,cameraScale,cameraAngle);
+  s->viewports[s->viewportCounter] = std::make_shared<Viewport2>(size,cameraPosition,cameraScale,cameraAngle);
   return s->viewportCounter++;
 }
 
@@ -1155,7 +1140,7 @@ size_t Draw2D::createNode(glm::mat3 const&mat){
   assert(this->_impl!=nullptr);
   auto*s=this->_impl;
   while(this->isNode(s->nodeCounter))s->nodeCounter++;
-  s->nodes[s->nodeCounter] = std::make_shared<Node>(mat);
+  s->nodes[s->nodeCounter] = std::make_shared<Node2>(mat);
   return s->nodeCounter++;
 }
 
@@ -1383,9 +1368,11 @@ void Draw2D::deleteLayer(size_t layer){
   assert(this->_impl!=nullptr);
   auto*s=this->_impl;
   if(!this->isLayer(layer))return;
-  if(s->layerParents.count(layer)!=0)
-    for(auto const&x:s->layerParents.at(layer))
+  if(s->layerParents.count(layer)!=0){
+    auto prnts = s->layerParents.at(layer);
+    for(auto const&x:prnts)
       this->eraseLayer(x,layer);
+  }
   if(this->hasNode(layer))
     s->removeParent(s->nodeParentLayers,this->getNode(layer),layer);
   s->layerParents.erase(layer);
@@ -1397,10 +1384,13 @@ void Draw2D::deleteViewport(size_t viewport){
   assert(this->_impl!=nullptr);
   auto*s=this->_impl;
   if(!this->isViewport(viewport))return;
-  if(s->viewportParents.count(viewport)!=0)
-    for(auto const&x:s->layerParents.at(viewport))
+  if(s->viewportParents.count(viewport)!=0){
+    auto prnts = s->layerParents.at(viewport);
+    for(auto const&x:prnts)
       this->eraseViewport(x,viewport);
-  for(auto const&x:s->viewports.at(viewport)->layers)
+  }
+  auto lrs = s->viewports.at(viewport)->layers;
+  for(auto const&x:lrs)
     s->removeParent(s->layerParents,x,viewport);
   s->viewportParents.erase(viewport);
   s->viewports.erase(viewport);
@@ -1411,12 +1401,16 @@ void Draw2D::deleteNode(size_t node){
   assert(this->_impl!=nullptr);
   auto*s=this->_impl;
   if(!this->isNode(node))return;
-  if(s->nodeParentNodes.count(node)!=0)
-    for(auto const&x:s->nodeParentNodes.at(node))
+  if(s->nodeParentNodes.count(node)!=0){
+    auto nds = s->nodeParentNodes.at(node);
+    for(auto const&x:nds)
       this->eraseNode(x,node);
-  if(s->nodeParentLayers.count(node)!=0)
-    for(auto const&x:s->nodeParentLayers.at(node))
+  }
+  if(s->nodeParentLayers.count(node)!=0){
+    auto lrs = s->nodeParentLayers.at(node);
+    for(auto const&x:lrs)
       this->eraseNode(x);
+  }
   for(auto const&x:s->nodes.at(node)->childs)
     s->removeParent(s->nodeParentNodes,x,node);
   for(auto const&x:s->nodes.at(node)->viewports)
@@ -1434,9 +1428,11 @@ void Draw2D::deletePrimitive(size_t primitive){
   assert(this->_impl!=nullptr);
   auto*s=this->_impl;
   if(!this->isPrimitive(primitive))return;
-  if(s->primitiveParents.count(primitive)!=0)
-    for(auto const&x:s->primitiveParents.at(primitive))
+  if(s->primitiveParents.count(primitive)!=0){
+    auto prnts = s->primitiveParents.at(primitive);
+    for(auto const&x:prnts)
       this->erasePrimitive(x,primitive);
+  }
 
   s->primitiveParents.erase(primitive);
   s->primitives.erase(primitive);

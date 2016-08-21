@@ -157,20 +157,20 @@ class Draw2D{
     void   deleteLayer (size_t layer);
     size_t createLayer();
 
-    bool      isNode          (size_t node)const;
-    size_t    getNofNodes     (size_t node)const;
+    bool      isNode          (size_t node         )const;
+    size_t    getNofNodes     (size_t node         )const;
     size_t    getNode         (size_t node,size_t i)const;
-    size_t    getNofViewports (size_t node)const;
+    size_t    getNofViewports (size_t node         )const;
     size_t    getViewport     (size_t node,size_t i)const;
-    size_t    getNofPrimitives(size_t node)const;
+    size_t    getNofPrimitives(size_t node         )const;
     size_t    getPrimitive    (size_t node,size_t i)const;
-    glm::mat3 getNodeMatrix   (size_t node)const;
-    glm::mat3 getNodeTransform(size_t node)const;
+    glm::mat3 getNodeMatrix   (size_t node         )const;
+    glm::mat3 getNodeTransform(size_t node         )const;
     void      setNodeMatrix   (size_t node,glm::mat3 const&mat);
-    void      insertViewport  (size_t node,size_t viewport);
+    void      insertViewport  (size_t node,size_t viewport );
     void      insertNode      (size_t node,size_t childNode);
     void      insertPrimitive (size_t node,size_t primitive);
-    void      eraseViewport   (size_t node,size_t viewport);
+    void      eraseViewport   (size_t node,size_t viewport );
     void      eraseNode       (size_t node,size_t childNode);
     void      erasePrimitive  (size_t node,size_t primitive);
     void      deleteNode      (size_t node);

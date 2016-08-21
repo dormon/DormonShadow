@@ -13,6 +13,14 @@ set(INCLUDES
   include/Draw2DShaders.h
   include/GEDEEditor.h
   include/UI.h
+  include/Node.h
+  include/Layer.h
+  include/Viewport.h
+  include/AllContainer.h
+  include/Node2d.h
+  include/Viewport2d.h
+  include/CreateFontTexture.h
+  include/GDEImpl.h
   )
 
 set(SOURCES
@@ -24,6 +32,8 @@ set(SOURCES
   src/Draw2D.cpp
   src/GEDEEditor.cpp
   src/UI.cpp
+  src/CreateFontTexture.cpp
+  src/GDEImpl.cpp
   )
 
 include_directories(include /usr/local/include)

@@ -1,5 +1,8 @@
 #include<GEDEEditor.h>
+#include<Draw2D.h>
 #include<algorithm>
+
+#include<GDEImpl.h>
 
 #include<UI.h>
 using namespace gde;
@@ -95,6 +98,63 @@ void addToNode(ui::Element*elm,void*d){
     data->draw2D->insertPrimitive(data->node,primId);
   }
 }
+
+void addToNode2(ui::Element*elm,void*d){
+  auto node = (Node*)d;
+  glm::vec2 p = elm->getPosition();
+  glm::vec2 s = elm->getSize();
+  for(auto const&dd:elm->data){
+    if(dd->getId()!=DATA_PRIMITIVE)continue;
+    auto x = (Primitive*)dd->getData();
+    switch(x->type){
+      case Primitive::LINE:
+        node->addValue<Line>(
+              ((Line*)x)->points[0]*s+p,
+              ((Line*)x)->points[1]*s+p,
+              ((Line*)x)->width,
+              x->color);
+        break;
+      case Primitive::POINT:
+        node->addValue<Point>(
+              ((Point*)x)->point*s+p,
+              ((Point*)x)->size,
+              x->color);
+        break;
+      case Primitive::CIRCLE:
+        node->addValue<Circle>(
+              ((Circle*)x)->point*s+p,
+              ((Circle*)x)->size,
+              ((Circle*)x)->width,
+              x->color);
+        break;
+      case Primitive::TRIANGLE:
+        node->addValue<Triangle>(
+              ((Triangle*)x)->points[0]*s+p,
+              ((Triangle*)x)->points[1]*s+p,
+              ((Triangle*)x)->points[2]*s+p,
+              x->color);
+        break;
+      case Primitive::TEXT:
+        node->addValue<Text>(
+              ((Text*)x)->data,
+              ((Text*)x)->size,
+              ((Text*)x)->position*s+p,
+              ((Text*)x)->direction,
+              x->color);
+        break;
+      case Primitive::SPLINE:
+        node->addValue<Spline>(
+              ((Spline*)x)->points[0]*s+p,
+              ((Spline*)x)->points[1]*s+p,
+              ((Spline*)x)->points[2]*s+p,
+              ((Spline*)x)->points[3]*s+p,
+              ((Spline*)x)->width,
+              x->color);
+        break;
+    }
+  }
+}
+
 
 class CallHoverData{
   public:
@@ -227,9 +287,12 @@ class gde::EditorImpl{
       this->testFce = new Function(this->draw2d,"addSome",{"valueA","valueB","valueC","val"},"output");
       this->testFce->create();
       this->draw2d->insertNode(nn,this->testFce->node);
+      this->edit = new Edit(g,size);
+      this->testFce->root->visitor(addToNode2,this->edit->rootViewport->at(0)->root);
     }
+    Edit*edit;
     Function*testFce;
-    ~EditorImpl(){delete this->testFce;}
+    ~EditorImpl(){delete this->testFce;delete this->edit;}
     ge::gl::Context const&gl;
     std::shared_ptr<Draw2D>draw2d;
     bool middleDown = false;
@@ -284,6 +347,7 @@ void Editor::resize(size_t w,size_t h){
 }
 
 void Editor::draw(){
-  this->_impl->draw2d->draw();
+//  this->_impl->draw2d->draw();
+  this->_impl->edit->draw();
 }
 
