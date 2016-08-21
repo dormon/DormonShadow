@@ -66,4 +66,31 @@ class Edit{
     std::shared_ptr<ge::gl::Texture>fontTexture;
     std::shared_ptr<ge::gl::Program>stencilProgram;
     std::shared_ptr<ge::gl::VertexArray>stencilVAO;
+    glm::mat3 translate(glm::vec2 const&pos);
+    glm::mat3 rotate(float angle);
+    glm::mat3 scale(float scale);
+
 };
+
+inline glm::mat3 Edit::translate(glm::vec2 const&pos){
+  auto result = glm::mat3(1.f);
+  result[2]=glm::vec3(pos,1);
+  return result;
+}
+
+inline glm::mat3 Edit::rotate(float angle){
+  auto result = glm::mat3(1.f);
+  result[0].x =  glm::cos(angle);
+  result[0].y = -glm::sin(angle);
+  result[1].x =  glm::sin(angle);
+  result[1].y =  glm::cos(angle);
+  return result;
+}
+
+inline glm::mat3 Edit::scale(float scale){
+  auto result = glm::mat3(1.f);
+  result[0].x=scale;
+  result[1].y=scale;
+  return result;
+}
+

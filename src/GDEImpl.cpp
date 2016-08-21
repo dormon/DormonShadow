@@ -99,9 +99,9 @@ void Edit::drawViewport(Viewport2d*viewport,glm::mat3 const&model,glm::mat3 cons
       glm::max(glm::max(wp[0].x,wp[1].x),glm::max(wp[2].x,wp[3].x)),
       glm::max(glm::max(wp[0].y,wp[1].y),glm::max(wp[2].y,wp[3].y)))-op;
   gl.glViewport(op.x,op.y,os.x,os.y);
-  auto viewTranslate = Draw2D::translate(-viewport->cameraPosition);
-  auto viewRotation = Draw2D::rotate(viewport->cameraAngle);
-  auto viewScale = Draw2D::scale(viewport->cameraScale);
+  auto viewTranslate = Edit::translate(-viewport->cameraPosition);
+  auto viewRotation = Edit::rotate(viewport->cameraAngle);
+  auto viewScale = Edit::scale(viewport->cameraScale);
   glm::mat3 viewMatrix = viewRotation*viewTranslate*viewScale;
 
   for(auto const&x:*viewport){
@@ -396,7 +396,14 @@ void Edit::drawNode(Node2d*node,glm::mat3 const&model,glm::mat3 const&projection
 
 void Edit::mouseMotion(int32_t xrel,int32_t yrel,size_t x,size_t y){
   if(!this->currentViewport)return;
-  this->mouseMotionViewport(this->currentViewport,glm::vec2(xrel,yrel),glm::vec2(x,y));
+  auto viewTranslate = Edit::translate(-this->currentViewport->cameraPosition);
+  auto viewRotation = Edit::rotate(this->currentViewport->cameraAngle);
+  auto viewScale = Edit::scale(this->currentViewport->cameraScale);
+  auto matrix = glm::inverse(viewRotation*viewTranslate*viewScale);
+  this->mouseMotionViewport(
+      this->currentViewport,
+      glm::vec2(matrix*glm::vec3(xrel,yrel,0)),
+      glm::vec2(matrix*glm::vec3(x,y,1.f)));
 }
 
 bool Edit::mouseMotionViewport(Viewport2d*viewport,glm::vec2 const&diff,glm::vec2 const&pos){
@@ -415,12 +422,12 @@ bool Edit::mouseMotionLayer(Layer*layer,glm::vec2 const&diff,glm::vec2 const&pos
 
 bool Edit::mouseMotionNode(Node2d*node,glm::vec2 const&diff,glm::vec2 const&pos){
   auto newPos = glm::vec2(node->mat*glm::vec3(pos,1.f));
-  auto newDiff = glm::vec2(node->mat*glm::vec3(diff,1.f));
+  auto newDiff = glm::vec2(node->mat*glm::vec3(diff,0.f));
   if(node->hasValues<MouseMotionEvent>()){
     auto v = node->getValues<MouseMotionEvent>();
     for(auto const&x:v){
       auto vv = (MouseMotionEvent*)x;
-      if(newPos.x<vv->pos.x||newPos.y<vv->pos.y||newPos.x>vv->pos.x+vv->size.y||newPos.y>vv->pos.y+vv->size.y)continue;
+      if(newPos.x<vv->pos.x||newPos.y<vv->pos.y||newPos.x>vv->pos.x+vv->size.x||newPos.y>vv->pos.y+vv->size.y)continue;
       (*vv)(node,newDiff,newPos);
       return true;
     }

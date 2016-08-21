@@ -358,6 +358,7 @@ void Editor::mouseMotion(int32_t xrel,int32_t yrel,size_t x,size_t y){
   (void)y;
   if(this->_impl->middleDown){
     this->_impl->draw2d->setCameraPosition(this->_impl->draw2d->getCameraPosition()+glm::vec2(-xrel,-yrel));
+    this->_impl->edit->currentViewport->cameraPosition+=glm::vec2(-xrel,-yrel);
     return;
   }
   auto viewMatrix = this->_impl->draw2d->getCameraViewMatrix();
@@ -388,6 +389,7 @@ void Editor::mouseWheel(int32_t x,int32_t y){
   (void)x;
   (void)y;
   this->_impl->draw2d->setCameraScale(glm::clamp(this->_impl->draw2d->getCameraScale()+y*0.1f,0.001f,10.f));
+  this->_impl->edit->currentViewport->cameraScale = glm::clamp(this->_impl->edit->currentViewport->cameraScale+y*0.1f,0.001f,10.f);
 }
 void Editor::resize(size_t w,size_t h){
   this->_impl->draw2d->setViewportSize(glm::uvec2(w,h));
