@@ -5,11 +5,11 @@
 class Viewport;
 class Layer{
   public:
-    Layer(Node*root = nullptr);
+    Layer(std::shared_ptr<Node>const&root = nullptr);
     virtual ~Layer();
-    Node*root = nullptr;
+    std::shared_ptr<Node>root = nullptr;
 };
 
-inline Layer::Layer(Node*r):root(r){}
+inline Layer::Layer(std::shared_ptr<Node>const&r):root(r){}
 
-inline Layer::~Layer(){delete this->root;}
+inline Layer::~Layer(){}

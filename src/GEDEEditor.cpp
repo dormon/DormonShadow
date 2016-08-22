@@ -5,8 +5,10 @@
 
 using namespace gde;
 
+#define ___ std::cerr<<__FILE__<<" :"<<__LINE__<<std::endl
+
 void addToNode2(ui::Element*elm,void*d){
-  auto node = (Node*)d;
+  auto node = (Node2d*)d;
   glm::vec2 p = elm->getPosition();
   glm::vec2 s = elm->getSize();
   if(elm->data.hasValues<Line>()){
@@ -106,7 +108,7 @@ class Function{
       this->outputName = output;
     }
     ui::Element*root = nullptr;
-    Node2d*node = nullptr;
+    std::shared_ptr<Node2d>node = nullptr;
     void create();
     ~Function(){
       delete root;
@@ -185,8 +187,9 @@ void Function::create(){
   },{newData<MouseMotionEvent>([](){std::cerr<<"A";})});
   root->getSize();
 
-  //root->visitor(addToNode2,this->node);
-  //root->visitor(addMouseMotionEventToNode,this->node);
+  this->node = std::make_shared<Node2d>();
+  root->visitor(addToNode2,&*this->node);
+  root->visitor(addMouseMotionEventToNode,&*this->node);
 }
 
 class gde::EditorImpl{
@@ -195,8 +198,10 @@ class gde::EditorImpl{
       this->testFce = new Function("addSome",{"valueA","valueB","valueC","val"},"output");
       this->testFce->create();
       this->edit = new Edit(g,size);
-      this->testFce->root->visitor(addToNode2,this->edit->functionsNode);
-      this->testFce->root->visitor(addMouseMotionEventToNode,this->edit->functionsNode);
+      this->edit->functionsNode->push_back(this->testFce->node);
+      this->testFce->node->parent = &*this->edit->functionsNode;
+      //this->testFce->root->visitor(addToNode2,&*this->edit->functionsNode);
+      //this->testFce->root->visitor(addMouseMotionEventToNode,&*this->edit->functionsNode);
     }
     Edit*edit;
     Function*testFce;

@@ -2,13 +2,9 @@
 
 #include<Layer.h>
 
-class Viewport: public std::vector<Layer*>{
+class Viewport: public std::vector<std::shared_ptr<Layer>>{
   public:
     virtual~Viewport();
 };
 
-inline Viewport::~Viewport(){
-  assert(this!=nullptr);
-  for(auto const&x:*this)
-    delete x;
-}
+inline Viewport::~Viewport(){}

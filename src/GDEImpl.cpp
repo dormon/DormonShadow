@@ -50,23 +50,20 @@ Edit::Edit(ge::gl::Context const&g,glm::uvec2 const&size):gl(g){
       {std::make_shared<Shader>(GL_VERTEX_SHADER,stencilVS)});
   this->stencilVAO = std::make_shared<VertexArray>();
 
-  this->rootViewport = new Viewport2d(size);
-  this->currentViewport = this->rootViewport;
+  this->rootViewport = std::make_shared<Viewport2d>(size);
 
-  this->rootViewport->push_back(new Layer(new Node2d()));//edit layer
-  this->rootViewport->push_back(new Layer(new Node2d()));//menu layer
-  this->rootViewport->at(0)->root->addValue<Viewport2d>(size);
-  this->editViewport = this->rootViewport->at(0)->root->getValue<Viewport2d>(0);
-  this->editViewport->push_back(new Layer(new Node2d()));//connection layer
-  this->editViewport->push_back(new Layer(new Node2d()));//function layer
-  this->connectionsNode = (Node2d*)this->editViewport->at(0)->root;
-  this->functionsNode = (Node2d*)this->editViewport->at(1)->root;
-  this->menuNode = (Node2d*)this->rootViewport->at(1)->root;
+  this->rootViewport->push_back(std::make_shared<Layer>(std::make_shared<Node2d>()));//edit layer
+  this->rootViewport->push_back(std::make_shared<Layer>(std::make_shared<Node2d>()));//menu layer
+  this->rootViewport->at(0)->root->addValue<std::shared_ptr<Viewport2d>>(new Viewport2d(size));
+  this->editViewport = *this->rootViewport->at(0)->root->getValue<std::shared_ptr<Viewport2d>>(0);
+  this->editViewport->push_back(std::make_shared<Layer>(std::make_shared<Node2d>()));//connection layer
+  this->editViewport->push_back(std::make_shared<Layer>(std::make_shared<Node2d>()));//function layer
+  this->connectionsNode = std::dynamic_pointer_cast<Node2d>(this->editViewport->at(0)->root);
+  this->functionsNode = std::dynamic_pointer_cast<Node2d>(this->editViewport->at(1)->root);
+  this->menuNode = std::dynamic_pointer_cast<Node2d>(this->rootViewport->at(1)->root);
 }
 
-Edit::~Edit(){
-  delete this->rootViewport;
-}
+Edit::~Edit(){}
 
 void Edit::draw(){
 
@@ -78,7 +75,7 @@ void Edit::draw(){
   gl.glDisable(GL_DEPTH_TEST);
   gl.glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 
-  auto v = this->currentViewport;
+  auto v = this->rootViewport;
   if(v==nullptr)return;
 
   auto viewProjection = glm::mat3(1.f);
@@ -92,7 +89,7 @@ void Edit::draw(){
   gl.glDisable(GL_STENCIL_TEST);
 }
 
-void Edit::drawViewport(Viewport2d*viewport,glm::mat3 const&model,glm::mat3 const&projection){
+void Edit::drawViewport(std::shared_ptr<Viewport2d>const&viewport,glm::mat3 const&model,glm::mat3 const&projection){
   glm::vec3 wp[4];
   wp[0]=model*glm::vec3(0.f,0.f,1.f);
   wp[1]=model*glm::vec3(glm::vec2(viewport->cameraSize.x,0.f   ),1.f);
@@ -137,10 +134,10 @@ void Edit::drawViewport(Viewport2d*viewport,glm::mat3 const&model,glm::mat3 cons
   }
 }
 
-void Edit::drawLayer(Layer*layer,glm::mat3 const&model,glm::mat3 const&projection){
+void Edit::drawLayer(std::shared_ptr<Layer>const&layer,glm::mat3 const&model,glm::mat3 const&projection){
   assert(layer!=nullptr);
   if(!layer->root)return;
-  this->drawNode((Node2d*)layer->root,model,projection);
+  this->drawNode(std::dynamic_pointer_cast<Node2d>(layer->root),model,projection);
 }
 
 class RenderData{
@@ -166,7 +163,7 @@ class RenderData{
     bool changed = true;
 };
 
-void Edit::drawNode(Node2d*node,glm::mat3 const&model,glm::mat3 const&projection){
+void Edit::drawNode(std::shared_ptr<Node2d>const&node,glm::mat3 const&model,glm::mat3 const&projection){
   assert(node!=nullptr);
   glm::mat3 newModelMatrix = node->mat*model;
   glm::mat3 matrix = projection*newModelMatrix;
@@ -388,27 +385,27 @@ void Edit::drawNode(Node2d*node,glm::mat3 const&model,glm::mat3 const&projection
   this->gl.glDrawArrays(GL_POINTS,0,rd->nofCharacters);
   rd->textVAO->unbind();
 
-  if(node->hasValues<Viewport2d>()){
-    auto viewportPtrs = node->getValues<Viewport2d>();
+  if(node->hasValues<std::shared_ptr<Viewport2d>>()){
+    auto viewportPtrs = node->getValues<std::shared_ptr<Viewport2d>>();
     for(auto const&x:viewportPtrs)
-      this->drawViewport((Viewport2d*)x,newModelMatrix,projection);
+      this->drawViewport(*(std::shared_ptr<Viewport2d>*)x,newModelMatrix,projection);
   }
 
   for(auto x:*node){
-    this->drawNode((Node2d*)x,newModelMatrix,projection);
+    this->drawNode(std::dynamic_pointer_cast<Node2d>(x),newModelMatrix,projection);
   }
  
 }
 
 void Edit::mouseMotion(int32_t xrel,int32_t yrel,size_t x,size_t y){
-  if(!this->currentViewport)return;
+  if(!this->rootViewport)return;
   this->mouseMotionViewport(
       this->rootViewport,
       glm::vec2(xrel,yrel),
       glm::vec2(x,y));
 }
 
-bool Edit::mouseMotionViewport(Viewport2d*viewport,glm::vec2 const&diff,glm::vec2 const&pos){
+bool Edit::mouseMotionViewport(std::shared_ptr<Viewport2d>const&viewport,glm::vec2 const&diff,glm::vec2 const&pos){
   if(!viewport)return false;
   auto viewTranslate = Edit::translate(-viewport->cameraPosition);
   auto viewRotation = Edit::rotate(viewport->cameraAngle);
@@ -422,13 +419,13 @@ bool Edit::mouseMotionViewport(Viewport2d*viewport,glm::vec2 const&diff,glm::vec
   return false;
 }
 
-bool Edit::mouseMotionLayer(Layer*layer,glm::vec2 const&diff,glm::vec2 const&pos){
+bool Edit::mouseMotionLayer(std::shared_ptr<Layer>const&layer,glm::vec2 const&diff,glm::vec2 const&pos){
   if(!layer)return false;
   if(!layer->root)return false;
-  return this->mouseMotionNode((Node2d*)layer->root,diff,pos);
+  return this->mouseMotionNode(std::dynamic_pointer_cast<Node2d>(layer->root),diff,pos);
 }
 
-bool Edit::mouseMotionNode(Node2d*node,glm::vec2 const&diff,glm::vec2 const&pos){
+bool Edit::mouseMotionNode(std::shared_ptr<Node2d>const&node,glm::vec2 const&diff,glm::vec2 const&pos){
   auto matrix = glm::inverse(node->mat);
   auto newPos = glm::vec2(matrix*glm::vec3(pos,1.f));
   auto newDiff = glm::vec2(matrix*glm::vec3(diff,0.f));
@@ -442,15 +439,15 @@ bool Edit::mouseMotionNode(Node2d*node,glm::vec2 const&diff,glm::vec2 const&pos)
       handled = true;
     }
   }
-  if(node->hasValues<Viewport2d>()){
-    auto v = node->getValues<Viewport2d>();
+  if(node->hasValues<std::shared_ptr<Viewport2d>>()){
+    auto v = node->getValues<std::shared_ptr<Viewport2d>>();
     for(auto const&x:v){
-      auto vv = (Viewport2d*)x;
+      auto vv = *(std::shared_ptr<Viewport2d>*)x;
       handled |=this->mouseMotionViewport(vv,newDiff,newPos);
     }
   }
   for(auto const&x:*node)
-    handled |=this->mouseMotionNode((Node2d*)x,newDiff,newPos);
+    handled |=this->mouseMotionNode(std::dynamic_pointer_cast<Node2d>(x),newDiff,newPos);
   return handled;
 }
 

@@ -1,11 +1,12 @@
 #pragma once
 
+#include<memory>
 #include<vector>
 #include<functional>
 #include<cassert>
 #include<AllContainer.h>
 
-class Node: public std::vector<Node*>, public AllContainer{
+class Node: public std::vector<std::shared_ptr<Node>>, public AllContainer{
   public:
     Node(Node*parent = nullptr);
     virtual ~Node();
@@ -18,11 +19,7 @@ class Node: public std::vector<Node*>, public AllContainer{
 
 inline Node::Node(Node*p):parent(p){}
 
-inline Node::~Node(){
-  assert(this!=nullptr);
-  for(auto const&x:*this)
-    delete x;
-}
+inline Node::~Node(){}
 
 inline void Node::visitor(
     std::function<bool(Node*,void*)>const&atEnter,

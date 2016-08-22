@@ -8,33 +8,33 @@
 
 class MouseMotionEvent{
   public:
-    std::function<void(Node2d*,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&)>callback = nullptr;
+    std::function<void(std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&)>callback = nullptr;
     std::shared_ptr<void>userData;
     glm::vec2 pos;
     glm::vec2 size;
     MouseMotionEvent(
         glm::vec2 const&p,
         glm::vec2 const&s,
-        std::function<void(Node2d*,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&)>const&c,
+        std::function<void(std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&)>const&c,
         std::shared_ptr<void>const&data = nullptr):callback(c),userData(data),pos(p),size(s){}
     MouseMotionEvent(
-        std::function<void(Node2d*,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&)>const&c,
+        std::function<void(std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&)>const&c,
         std::shared_ptr<void>const&data = nullptr):MouseMotionEvent(glm::vec2(0.f),glm::vec2(0.f),c,data){}
     MouseMotionEvent(
-        std::function<void(Node2d*,std::shared_ptr<void>const&)>const&c,
+        std::function<void(std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&)>const&c,
         std::shared_ptr<void>const&data = nullptr):MouseMotionEvent(
-          [c](Node2d*n,std::shared_ptr<void>const&d,glm::vec2 const&,glm::vec2 const&){c(n,d);},data){}
+          [c](std::shared_ptr<Node2d>const&n,std::shared_ptr<void>const&d,glm::vec2 const&,glm::vec2 const&){c(n,d);},data){}
     MouseMotionEvent(
         std::function<void(std::shared_ptr<void>const&)>const&c,
         std::shared_ptr<void>const&data = nullptr):MouseMotionEvent(
-          [c](Node2d*,std::shared_ptr<void>const&d,glm::vec2 const&,glm::vec2 const&){c(d);},data){}
+          [c](std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&d,glm::vec2 const&,glm::vec2 const&){c(d);},data){}
     MouseMotionEvent(
-        std::function<void(Node2d*)>const&c):MouseMotionEvent(
-        [c](Node2d*n,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&){c(n);}){}
+        std::function<void(std::shared_ptr<Node2d>const&)>const&c):MouseMotionEvent(
+        [c](std::shared_ptr<Node2d>const&n,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&){c(n);}){}
     MouseMotionEvent(
         std::function<void()>const&c):MouseMotionEvent(
-        [c](Node2d*,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&){c();}){}
-    void operator()(Node2d*node,glm::vec2 const&diff,glm::vec2 const&pos){
+        [c](std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&){c();}){}
+    void operator()(std::shared_ptr<Node2d>const&node,glm::vec2 const&diff,glm::vec2 const&pos){
       assert(this->callback!=nullptr);
       this->callback(node,this->userData,diff,pos);
     }
@@ -46,19 +46,18 @@ class Edit{
     Edit(ge::gl::Context const&gl,glm::uvec2 const&size);
     ~Edit();
     void draw();
-    void drawViewport(Viewport2d*viewport,glm::mat3 const&model,glm::mat3 const&viewProjection);
-    void drawLayer(Layer*layer,glm::mat3 const&model,glm::mat3 const&viewProjection);
-    void drawNode(Node2d*node,glm::mat3 const&model,glm::mat3 const&viewProjection);
+    void drawViewport(std::shared_ptr<Viewport2d>const&viewport,glm::mat3 const&model,glm::mat3 const&viewProjection);
+    void drawLayer(std::shared_ptr<Layer>const&layer,glm::mat3 const&model,glm::mat3 const&viewProjection);
+    void drawNode(std::shared_ptr<Node2d>const&node,glm::mat3 const&model,glm::mat3 const&viewProjection);
     void mouseMotion(int32_t xrel,int32_t yrel,size_t x,size_t y);
-    bool mouseMotionViewport(Viewport2d*viewport,glm::vec2 const&diff,glm::vec2 const&pos);
-    bool mouseMotionLayer(Layer*layer,glm::vec2 const&diff,glm::vec2 const&pos);
-    bool mouseMotionNode(Node2d*node,glm::vec2 const&diff,glm::vec2 const&pos);
-    Viewport2d*rootViewport;
-    Viewport2d*currentViewport;
-    Node2d*menuNode;
-    Viewport2d*editViewport;
-    Node2d*functionsNode;
-    Node2d*connectionsNode;
+    bool mouseMotionViewport(std::shared_ptr<Viewport2d>const&viewport,glm::vec2 const&diff,glm::vec2 const&pos);
+    bool mouseMotionLayer(std::shared_ptr<Layer>const&layer,glm::vec2 const&diff,glm::vec2 const&pos);
+    bool mouseMotionNode(std::shared_ptr<Node2d>const&node,glm::vec2 const&diff,glm::vec2 const&pos);
+    std::shared_ptr<Viewport2d>rootViewport;
+    std::shared_ptr<Node2d>menuNode;
+    std::shared_ptr<Viewport2d>editViewport;
+    std::shared_ptr<Node2d>functionsNode;
+    std::shared_ptr<Node2d>connectionsNode;
     ge::gl::Context const&gl;
     std::shared_ptr<ge::gl::Program>lineProgram;
     std::shared_ptr<ge::gl::Program>pointProgram;
