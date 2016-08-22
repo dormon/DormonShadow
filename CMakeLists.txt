@@ -21,6 +21,7 @@ set(INCLUDES
   include/Viewport2d.h
   include/CreateFontTexture.h
   include/GDEImpl.h
+  include/Primitives.h
   )
 
 set(SOURCES

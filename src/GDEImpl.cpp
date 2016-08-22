@@ -1,6 +1,6 @@
 #include<GDEImpl.h>
 
-#include<Draw2D.h>
+//#include<Draw2D.h>
 #include<Draw2DShaders.h>
 #include<CreateFontTexture.h>
 
@@ -54,8 +54,15 @@ Edit::Edit(ge::gl::Context const&g,glm::uvec2 const&size):gl(g){
   this->rootViewport = new Viewport2d(size);
   this->currentViewport = this->rootViewport;
 
-  this->currentViewport->push_back(new Layer());
-  this->currentViewport->at(0)->root = new Node2d();
+  this->rootViewport->push_back(new Layer(new Node2d()));//edit layer
+  this->rootViewport->push_back(new Layer(new Node2d()));//menu layer
+  this->rootViewport->at(0)->root->addValue<Viewport2d>(size);
+  this->editViewport = this->rootViewport->at(0)->root->getValue<Viewport2d>(0);
+  this->editViewport->push_back(new Layer(new Node2d()));//connection layer
+  this->editViewport->push_back(new Layer(new Node2d()));//function layer
+  this->connectionsNode = (Node2d*)this->editViewport->at(0)->root;
+  this->functionsNode = (Node2d*)this->editViewport->at(1)->root;
+  this->menuNode = (Node2d*)this->rootViewport->at(1)->root;
 }
 
 Edit::~Edit(){
@@ -382,8 +389,8 @@ void Edit::drawNode(Node2d*node,glm::mat3 const&model,glm::mat3 const&projection
   this->gl.glDrawArrays(GL_POINTS,0,rd->nofCharacters);
   rd->textVAO->unbind();
 
-  if(node->hasValues<Viewport>()){
-    auto viewportPtrs = node->getValues<Viewport>();
+  if(node->hasValues<Viewport2d>()){
+    auto viewportPtrs = node->getValues<Viewport2d>();
     for(auto const&x:viewportPtrs)
       this->drawViewport((Viewport2d*)x,newModelMatrix,projection);
   }
@@ -396,21 +403,23 @@ void Edit::drawNode(Node2d*node,glm::mat3 const&model,glm::mat3 const&projection
 
 void Edit::mouseMotion(int32_t xrel,int32_t yrel,size_t x,size_t y){
   if(!this->currentViewport)return;
-  auto viewTranslate = Edit::translate(-this->currentViewport->cameraPosition);
-  auto viewRotation = Edit::rotate(this->currentViewport->cameraAngle);
-  auto viewScale = Edit::scale(this->currentViewport->cameraScale);
-  auto matrix = glm::inverse(viewRotation*viewTranslate*viewScale);
   this->mouseMotionViewport(
-      this->currentViewport,
-      glm::vec2(matrix*glm::vec3(xrel,yrel,0)),
-      glm::vec2(matrix*glm::vec3(x,y,1.f)));
+      this->rootViewport,
+      glm::vec2(xrel,yrel),
+      glm::vec2(x,y));
 }
 
 bool Edit::mouseMotionViewport(Viewport2d*viewport,glm::vec2 const&diff,glm::vec2 const&pos){
   if(!viewport)return false;
-  if(pos.x<0.f||pos.y<0.f||pos.x>viewport->cameraSize.x||pos.y>viewport->cameraSize.y)return false;
+  auto viewTranslate = Edit::translate(-viewport->cameraPosition);
+  auto viewRotation = Edit::rotate(viewport->cameraAngle);
+  auto viewScale = Edit::scale(viewport->cameraScale);
+  auto matrix = glm::inverse(viewRotation*viewTranslate*viewScale);
+  glm::vec2 newDiff = glm::vec2(matrix*glm::vec3(diff,0.f));
+  glm::vec2 newPos  = glm::vec2(matrix*glm::vec3(pos,1.f));
+  if(newPos.x<0.f||newPos.y<0.f||newPos.x>viewport->cameraSize.x||newPos.y>viewport->cameraSize.y)return false;
   for(int32_t i=viewport->size()-1;i>=0;--i)
-    if(this->mouseMotionLayer(viewport->at(i),diff,pos))return true;
+    if(this->mouseMotionLayer(viewport->at(i),newDiff,newPos))return true;
   return false;
 }
 
@@ -421,8 +430,9 @@ bool Edit::mouseMotionLayer(Layer*layer,glm::vec2 const&diff,glm::vec2 const&pos
 }
 
 bool Edit::mouseMotionNode(Node2d*node,glm::vec2 const&diff,glm::vec2 const&pos){
-  auto newPos = glm::vec2(node->mat*glm::vec3(pos,1.f));
-  auto newDiff = glm::vec2(node->mat*glm::vec3(diff,0.f));
+  auto matrix = glm::inverse(node->mat);
+  auto newPos = glm::vec2(matrix*glm::vec3(pos,1.f));
+  auto newDiff = glm::vec2(matrix*glm::vec3(diff,0.f));
   if(node->hasValues<MouseMotionEvent>()){
     auto v = node->getValues<MouseMotionEvent>();
     for(auto const&x:v){
@@ -432,8 +442,8 @@ bool Edit::mouseMotionNode(Node2d*node,glm::vec2 const&diff,glm::vec2 const&pos)
       return true;
     }
   }
-  if(node->hasValues<Viewport>()){
-    auto v = node->getValues<Viewport>();
+  if(node->hasValues<Viewport2d>()){
+    auto v = node->getValues<Viewport2d>();
     for(auto const&x:v){
       auto vv = (Viewport2d*)x;
       if(this->mouseMotionViewport(vv,newDiff,newPos))return true;

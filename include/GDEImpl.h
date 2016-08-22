@@ -4,6 +4,7 @@
 #include<Viewport2d.h>
 #include<Layer.h>
 #include<Node2d.h>
+#include<Primitives.h>
 
 class MouseMotionEvent{
   public:
@@ -31,10 +32,6 @@ class MouseMotionEvent{
     MouseMotionEvent(
         std::function<void()>const&c,
         void*data = nullptr):MouseMotionEvent([c](Node2d*,void*,glm::vec2 const&,glm::vec2 const&){c();},data){}
-
-
-
-
     void operator()(Node2d*node,glm::vec2 const&diff,glm::vec2 const&pos){
       assert(this->callback!=nullptr);
       this->callback(node,this->userData,diff,pos);
@@ -56,6 +53,10 @@ class Edit{
     bool mouseMotionNode(Node2d*node,glm::vec2 const&diff,glm::vec2 const&pos);
     Viewport2d*rootViewport;
     Viewport2d*currentViewport;
+    Node2d*menuNode;
+    Viewport2d*editViewport;
+    Node2d*functionsNode;
+    Node2d*connectionsNode;
     ge::gl::Context const&gl;
     std::shared_ptr<ge::gl::Program>lineProgram;
     std::shared_ptr<ge::gl::Program>pointProgram;
