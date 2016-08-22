@@ -1,6 +1,5 @@
 #include<GDEImpl.h>
 
-//#include<Draw2D.h>
 #include<Draw2DShaders.h>
 #include<CreateFontTexture.h>
 
@@ -350,6 +349,13 @@ void Edit::drawNode(Node2d*node,glm::mat3 const&model,glm::mat3 const&projection
 
     rd->changed = false;
   }
+
+  this->triangleProgram->use();
+  this->triangleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
+  rd->triangleVAO->bind();
+  this->gl.glDrawArrays(GL_TRIANGLES,0,rd->nofTriangles*3);
+  rd->triangleVAO->unbind();
+
   this->lineProgram->use();
   this->lineProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   rd->lineVAO->bind();
@@ -361,7 +367,6 @@ void Edit::drawNode(Node2d*node,glm::mat3 const&model,glm::mat3 const&projection
   rd->pointVAO->bind();
   this->gl.glDrawArrays(GL_POINTS,0,rd->nofPoints);
   rd->pointVAO->unbind();
-
   
   this->circleProgram->use();
   this->circleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
@@ -369,12 +374,6 @@ void Edit::drawNode(Node2d*node,glm::mat3 const&model,glm::mat3 const&projection
   this->gl.glDrawArrays(GL_POINTS,0,rd->nofCircles);
   rd->circleVAO->unbind();
   
-  this->triangleProgram->use();
-  this->triangleProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
-  rd->triangleVAO->bind();
-  this->gl.glDrawArrays(GL_TRIANGLES,0,rd->nofTriangles*3);
-  rd->triangleVAO->unbind();
-
   this->splineProgram->use();
   this->splineProgram->setMatrix3fv("matrix",glm::value_ptr(matrix));
   rd->splineVAO->bind();
@@ -433,24 +432,25 @@ bool Edit::mouseMotionNode(Node2d*node,glm::vec2 const&diff,glm::vec2 const&pos)
   auto matrix = glm::inverse(node->mat);
   auto newPos = glm::vec2(matrix*glm::vec3(pos,1.f));
   auto newDiff = glm::vec2(matrix*glm::vec3(diff,0.f));
+  bool handled = false;
   if(node->hasValues<MouseMotionEvent>()){
     auto v = node->getValues<MouseMotionEvent>();
     for(auto const&x:v){
       auto vv = (MouseMotionEvent*)x;
       if(newPos.x<vv->pos.x||newPos.y<vv->pos.y||newPos.x>vv->pos.x+vv->size.x||newPos.y>vv->pos.y+vv->size.y)continue;
       (*vv)(node,newDiff,newPos);
-      return true;
+      handled = true;
     }
   }
   if(node->hasValues<Viewport2d>()){
     auto v = node->getValues<Viewport2d>();
     for(auto const&x:v){
       auto vv = (Viewport2d*)x;
-      if(this->mouseMotionViewport(vv,newDiff,newPos))return true;
+      handled |=this->mouseMotionViewport(vv,newDiff,newPos);
     }
   }
   for(auto const&x:*node)
-    if(this->mouseMotionNode((Node2d*)x,newDiff,newPos))return true;
-  return false;
+    handled |=this->mouseMotionNode((Node2d*)x,newDiff,newPos);
+  return handled;
 }
 

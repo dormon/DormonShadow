@@ -1,10 +1,8 @@
 #include<GEDEEditor.h>
-//#include<Draw2D.h>
 #include<algorithm>
-
 #include<GDEImpl.h>
-
 #include<UI.h>
+
 using namespace gde;
 
 void addToNode2(ui::Element*elm,void*d){
@@ -108,6 +106,7 @@ class Function{
       this->outputName = output;
     }
     ui::Element*root = nullptr;
+    Node2d*node = nullptr;
     void create();
     ~Function(){
       delete root;
@@ -158,7 +157,10 @@ void Function::create(){
                 new Split(1,//inputs
                   repear1D(this->inputNames.size(),[&](size_t i)->Element*{
                     return new Split(0,{
-                      new Rectangle(inputRadius*2,inputRadius*2,{newData<Circle>(.5,.5,inputRadius,lineWidth)}),
+                      new Rectangle(inputRadius*2,inputRadius*2,{
+                        newData<Circle>(.5,.5,inputRadius,lineWidth,lineColor),
+                        newData<MouseMotionEvent>([](std::shared_ptr<void>const&ptr){std::cerr<<"input: "<<*(int32_t*)ptr.get()<<std::endl;},std::make_shared<int32_t>(i))
+                        }),
                       new Rectangle(textIndent,0),
                       new Rectangle(fontSize*this->inputNames[i].length(),fontSize*2,{newData<Text>(this->inputNames[i],fontSize,textColor)})
                       });
@@ -183,6 +185,8 @@ void Function::create(){
   },{newData<MouseMotionEvent>([](){std::cerr<<"A";})});
   root->getSize();
 
+  //root->visitor(addToNode2,this->node);
+  //root->visitor(addMouseMotionEventToNode,this->node);
 }
 
 class gde::EditorImpl{
