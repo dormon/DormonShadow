@@ -5,6 +5,30 @@
 
 using namespace ge::gl;
 
+class RenderData{
+  public:
+    std::shared_ptr<ge::gl::Buffer>lineBuffer;
+    std::shared_ptr<ge::gl::VertexArray>lineVAO;
+    size_t nofLines = 0;
+    std::shared_ptr<ge::gl::Buffer>pointBuffer;
+    std::shared_ptr<ge::gl::VertexArray>pointVAO;
+    size_t nofPoints = 0;
+    std::shared_ptr<ge::gl::Buffer>circleBuffer;
+    std::shared_ptr<ge::gl::VertexArray>circleVAO;
+    size_t nofCircles = 0;
+    std::shared_ptr<ge::gl::Buffer>triangleBuffer;
+    std::shared_ptr<ge::gl::VertexArray>triangleVAO;
+    size_t nofTriangles = 0;
+    std::shared_ptr<ge::gl::Buffer>splineBuffer;
+    std::shared_ptr<ge::gl::VertexArray>splineVAO;
+    size_t nofSplines = 0;
+    std::shared_ptr<ge::gl::Buffer>textBuffer;
+    std::shared_ptr<ge::gl::VertexArray>textVAO;
+    size_t nofCharacters = 0;
+};
+
+
+
 Edit::Edit(ge::gl::Context const&g,glm::uvec2 const&size):gl(g){
   this->lineProgram = std::make_shared<Program>();
   this->lineProgram->link(
@@ -147,9 +171,12 @@ void Edit::drawNode(std::shared_ptr<Node2d>const&node,glm::mat3 const&model,glm:
   if(!node->hasValues<RenderData>()){
     node->addValue<RenderData>();
   }
+  if(!node->hasNamedValue<bool>("dataChanged"))
+    node->addNamedValue<bool>("dataChanged",true);
+
   auto rd = node->getValue<RenderData>(0);
 
-  if(rd->changed){
+  if(*node->getNamedValue<bool>("dataChanged")){
     std::vector<float>lineData;
     std::vector<float>pointData;
     std::vector<float>circleData;
@@ -321,7 +348,7 @@ void Edit::drawNode(std::shared_ptr<Node2d>const&node,glm::mat3 const&model,glm:
     rd->textVAO->addAttrib(rd->textBuffer,
         5,1,GL_FLOAT,sizeof(float)*11,sizeof(float)*10);
 
-    rd->changed = false;
+    *node->getNamedValue<bool>("dataChanged") = false;
   }
 
   this->triangleProgram->use();

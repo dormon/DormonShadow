@@ -6,29 +6,6 @@
 #include<Node2d.h>
 #include<Primitives.h>
 
-class RenderData{
-  public:
-    std::shared_ptr<ge::gl::Buffer>lineBuffer;
-    std::shared_ptr<ge::gl::VertexArray>lineVAO;
-    size_t nofLines = 0;
-    std::shared_ptr<ge::gl::Buffer>pointBuffer;
-    std::shared_ptr<ge::gl::VertexArray>pointVAO;
-    size_t nofPoints = 0;
-    std::shared_ptr<ge::gl::Buffer>circleBuffer;
-    std::shared_ptr<ge::gl::VertexArray>circleVAO;
-    size_t nofCircles = 0;
-    std::shared_ptr<ge::gl::Buffer>triangleBuffer;
-    std::shared_ptr<ge::gl::VertexArray>triangleVAO;
-    size_t nofTriangles = 0;
-    std::shared_ptr<ge::gl::Buffer>splineBuffer;
-    std::shared_ptr<ge::gl::VertexArray>splineVAO;
-    size_t nofSplines = 0;
-    std::shared_ptr<ge::gl::Buffer>textBuffer;
-    std::shared_ptr<ge::gl::VertexArray>textVAO;
-    size_t nofCharacters = 0;
-    bool changed = true;
-};
-
 class MouseMotionEvent{
   public:
     enum Type{

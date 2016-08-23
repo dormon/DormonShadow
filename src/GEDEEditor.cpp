@@ -204,8 +204,8 @@ void Function::setLineColor(glm::vec4 const&color){
     auto vv=(Line*)x;
     vv->color = color;
   }
-  if(!this->node->hasValues<RenderData>())return;
-  this->node->getValue<RenderData>(0)->changed = true;
+  if(!this->node->hasNamedValue<bool>("dataChanged"))return;
+  *this->node->getNamedValue<bool>("dataChanged") = true;
 }
 
 class gde::EditorImpl{
