@@ -89,7 +89,7 @@ void addMouseMotionEventToNode(ui::Element*elm,void*d){
     auto v = elm->data.getValues<MouseMotionEvent>();
     for(auto const&x:v){
       auto vv = (MouseMotionEvent*)x;
-      node->addValue<MouseMotionEvent>(p,s,vv->callback,vv->userData);
+      node->addValue<MouseMotionEvent>(p,s,vv->callback,vv->userData,vv->type);
     }
   }
 }
@@ -113,8 +113,8 @@ class Function{
     ~Function(){
       delete root;
     }
+    void setLineColor(glm::vec4 const&color = glm::vec4(1.f));
 };
-
 
 
 void Function::create(){
@@ -184,7 +184,10 @@ void Function::create(){
         new Rectangle(lineWidth,0,{newData<Line>(.5,0,.5,1,lineWidth,lineColor)}),//right line
       }),
       new Rectangle(0,lineWidth,{newData<Line>(0,.5,1,.5,lineWidth,lineColor)}),//bottom line
-  },{newData<MouseMotionEvent>([](){std::cerr<<"A";})});
+  },{
+    newData<MouseMotionEvent>([](void*ptr){((Function*)ptr)->setLineColor();},this,MouseMotionEvent::MOUSE_ENTER),
+    newData<MouseMotionEvent>([](void*ptr){((Function*)ptr)->setLineColor(glm::vec4(0.f,1.f,0.f,1.f));},this,MouseMotionEvent::MOUSE_EXIT),
+  });
   root->getSize();
 
   this->node = std::make_shared<Node2d>();
@@ -192,20 +195,39 @@ void Function::create(){
   root->visitor(addMouseMotionEventToNode,&*this->node);
 }
 
+void Function::setLineColor(glm::vec4 const&color){
+  assert(this!=nullptr);
+  assert(this->node!=nullptr);
+  if(!this->node->hasValues<Line>())return;
+  auto v = this->node->getValues<Line>();
+  for(auto const&x:v){
+    auto vv=(Line*)x;
+    vv->color = color;
+  }
+  if(!this->node->hasValues<RenderData>())return;
+  this->node->getValue<RenderData>(0)->changed = true;
+}
+
 class gde::EditorImpl{
   public:
     EditorImpl(ge::gl::Context const&g,glm::uvec2 const&size):gl(g){
       this->testFce = new Function("addSome",{"valueA","valueB","valueC","val"},"output");
+      this->testFce2 = new Function("computeProjection",{"fovy","aspect","near","far"},"projection");
       this->testFce->create();
+      this->testFce2->create();
       this->edit = new Edit(g,size);
       this->edit->functionsNode->push_back(this->testFce->node);
       this->testFce->node->parent = &*this->edit->functionsNode;
+      this->edit->functionsNode->push_back(this->testFce2->node);
+      this->testFce2->node->parent = &*this->edit->functionsNode;
+      this->testFce2->node->mat = Edit::translate(glm::vec2(100,100));
       //this->testFce->root->visitor(addToNode2,&*this->edit->functionsNode);
       //this->testFce->root->visitor(addMouseMotionEventToNode,&*this->edit->functionsNode);
     }
     Edit*edit;
     Function*testFce;
-    ~EditorImpl(){delete this->testFce;delete this->edit;}
+    Function*testFce2;
+    ~EditorImpl(){delete this->testFce;delete this->testFce2;delete this->edit;}
     ge::gl::Context const&gl;
     bool middleDown = false;
 };

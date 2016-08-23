@@ -140,29 +140,6 @@ void Edit::drawLayer(std::shared_ptr<Layer>const&layer,glm::mat3 const&model,glm
   this->drawNode(std::dynamic_pointer_cast<Node2d>(layer->root),model,projection);
 }
 
-class RenderData{
-  public:
-    std::shared_ptr<Buffer>lineBuffer;
-    std::shared_ptr<VertexArray>lineVAO;
-    size_t nofLines = 0;
-    std::shared_ptr<Buffer>pointBuffer;
-    std::shared_ptr<VertexArray>pointVAO;
-    size_t nofPoints = 0;
-    std::shared_ptr<Buffer>circleBuffer;
-    std::shared_ptr<VertexArray>circleVAO;
-    size_t nofCircles = 0;
-    std::shared_ptr<Buffer>triangleBuffer;
-    std::shared_ptr<VertexArray>triangleVAO;
-    size_t nofTriangles = 0;
-    std::shared_ptr<Buffer>splineBuffer;
-    std::shared_ptr<VertexArray>splineVAO;
-    size_t nofSplines = 0;
-    std::shared_ptr<Buffer>textBuffer;
-    std::shared_ptr<VertexArray>textVAO;
-    size_t nofCharacters = 0;
-    bool changed = true;
-};
-
 void Edit::drawNode(std::shared_ptr<Node2d>const&node,glm::mat3 const&model,glm::mat3 const&projection){
   assert(node!=nullptr);
   glm::mat3 newModelMatrix = node->mat*model;
@@ -413,7 +390,10 @@ bool Edit::mouseMotionViewport(std::shared_ptr<Viewport2d>const&viewport,glm::ve
   auto matrix = glm::inverse(viewRotation*viewTranslate*viewScale);
   glm::vec2 newDiff = glm::vec2(matrix*glm::vec3(diff,0.f));
   glm::vec2 newPos  = glm::vec2(matrix*glm::vec3(pos,1.f));
-  if(newPos.x<0.f||newPos.y<0.f||newPos.x>viewport->cameraSize.x||newPos.y>viewport->cameraSize.y)return false;
+  if(
+      (newPos.x<0.f||newPos.y<0.f||newPos.x>viewport->cameraSize.x||newPos.y>viewport->cameraSize.y)&&
+      (newPos.x-newDiff.x<0.f||newPos.y-newDiff.y<0.f||newPos.x-newDiff.x>viewport->cameraSize.x||newPos.y-newDiff.y>viewport->cameraSize.y)
+      )return false;
   for(int32_t i=viewport->size()-1;i>=0;--i)
     if(this->mouseMotionLayer(viewport->at(i),newDiff,newPos))return true;
   return false;
@@ -429,12 +409,21 @@ bool Edit::mouseMotionNode(std::shared_ptr<Node2d>const&node,glm::vec2 const&dif
   auto matrix = glm::inverse(node->mat);
   auto newPos = glm::vec2(matrix*glm::vec3(pos,1.f));
   auto newDiff = glm::vec2(matrix*glm::vec3(diff,0.f));
+  glm::vec2 lastPos = newPos-newDiff;
   bool handled = false;
   if(node->hasValues<MouseMotionEvent>()){
     auto v = node->getValues<MouseMotionEvent>();
     for(auto const&x:v){
       auto vv = (MouseMotionEvent*)x;
-      if(newPos.x<vv->pos.x||newPos.y<vv->pos.y||newPos.x>vv->pos.x+vv->size.x||newPos.y>vv->pos.y+vv->size.y)continue;
+      bool lastStatus = lastPos.x>vv->pos.x&&lastPos.y>vv->pos.y&&lastPos.x<=vv->pos.x+vv->size.x&&lastPos.y<=vv->pos.y+vv->size.y;
+      bool status = newPos.x>vv->pos.x&&newPos.y>vv->pos.y&&newPos.x<=vv->pos.x+vv->size.x&&newPos.y<=vv->pos.y+vv->size.y;
+      if(vv->type == MouseMotionEvent::MOUSE_EXIT)
+        if(!lastStatus || status)continue;
+      if(vv->type == MouseMotionEvent::MOUSE_ENTER){
+        if(lastStatus || !status)continue;
+      }
+      if(vv->type == MouseMotionEvent::MOUSE_MOVE)
+        if(!lastStatus && !status)continue;
       (*vv)(node,newDiff,newPos);
       handled = true;
     }
