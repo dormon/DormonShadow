@@ -94,6 +94,19 @@ void addMouseMotionEventToNode(ui::Element*elm,void*d){
   }
 }
 
+void addMouseButtonEventToNode(ui::Element*elm,void*d){
+  auto node = (Node2d*)d;
+  glm::vec2 p = elm->getPosition();
+  glm::vec2 s = elm->getSize();
+  if(elm->data.hasValues<MouseButtonEvent>()){
+    auto v = elm->data.getValues<MouseButtonEvent>();
+    for(auto const&x:v){
+      auto vv = (MouseButtonEvent*)x;
+      node->addValue<MouseButtonEvent>(p,s,vv->callback,vv->userData,vv->down,vv->button);
+    }
+  }
+}
+
 class Function{
   public:
     std::string functionName;
@@ -113,7 +126,10 @@ class Function{
     ~Function(){
       delete root;
     }
+    size_t id = 0;
     void setLineColor(glm::vec4 const&color = glm::vec4(1.f));
+    glm::vec2 grabedPosition;
+    void move(glm::vec2 const&mousePosition);
 };
 
 
@@ -149,7 +165,11 @@ void Function::create(){
               new Rectangle(captionMargin,0),
               }),
             new Rectangle(0,captionMargin),
-            },{newData<Triangle>(0,0,1,0,1,1,captionBackgrounColor),newData<Triangle>(0,0,1,1,0,1,captionBackgrounColor)}),
+            },{
+            newData<Triangle>(0,0,1,0,1,1,captionBackgrounColor),
+            newData<Triangle>(0,0,1,1,0,1,captionBackgrounColor),
+            newData<MouseButtonEvent>([](){std::cout<<"klikam"<<std::endl;}),
+            }),
           new Rectangle(0,lineWidth,{newData<Line>(0,.5,1,.5,lineWidth,lineColor)}),//caption line
           new Split(0,{
             new Rectangle(margin,0),
@@ -193,6 +213,7 @@ void Function::create(){
   this->node = std::make_shared<Node2d>();
   root->visitor(addToNode2,&*this->node);
   root->visitor(addMouseMotionEventToNode,&*this->node);
+  root->visitor(addMouseButtonEventToNode,&*this->node);
 }
 
 void Function::setLineColor(glm::vec4 const&color){
@@ -229,7 +250,7 @@ class gde::EditorImpl{
     Function*testFce2;
     ~EditorImpl(){delete this->testFce;delete this->testFce2;delete this->edit;}
     ge::gl::Context const&gl;
-    bool middleDown = false;
+    bool mouseButtons[3] = {false,false,false};
 };
 
 Editor::Editor(ge::gl::Context const&gl,glm::uvec2 const&size){
@@ -244,7 +265,7 @@ void Editor::mouseMotion(int32_t xrel,int32_t yrel,size_t x,size_t y){
   (void)yrel;
   (void)x;
   (void)y;
-  if(this->_impl->middleDown){
+  if(this->_impl->mouseButtons[MIDDLE]){
     this->_impl->edit->editViewport->cameraPosition+=glm::vec2(-xrel,-yrel);
     return;
   }
@@ -252,17 +273,17 @@ void Editor::mouseMotion(int32_t xrel,int32_t yrel,size_t x,size_t y){
 }
 
 void Editor::mouseButtonDown(MouseButton b,size_t x,size_t y){
-  (void)b;
   (void)x;
   (void)y;
-  if(b==MIDDLE)this->_impl->middleDown = true;
+  this->_impl->mouseButtons[b] = true;
+  this->_impl->edit->mouseButton(true,b,x,y);
 }
 
 void Editor::mouseButtonUp(MouseButton b,size_t x,size_t y){
-  (void)b;
   (void)x;
   (void)y;
-  if(b==MIDDLE)this->_impl->middleDown = false;
+  this->_impl->mouseButtons[b] = false;
+  this->_impl->edit->mouseButton(false,b,x,y);
 }
 
 void Editor::mouseWheel(int32_t x,int32_t y){

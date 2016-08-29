@@ -489,10 +489,10 @@ bool Application::mouseButton(SDL_Event const&event,void*d){
   auto &kernel = app->kernel;
   if(kernel.variableRegister->hasVariable(name))
     kernel.variableRegister->getVariable(name)->update(DOWN);
-  gde::Editor::MouseButton b;
-  if(event.button.button == SDL_BUTTON_LEFT)b=gde::Editor::LEFT;
-  if(event.button.button == SDL_BUTTON_MIDDLE)b=gde::Editor::MIDDLE;
-  if(event.button.button == SDL_BUTTON_RIGHT)b=gde::Editor::RIGHT;
+  gde::MouseButton b;
+  if(event.button.button == SDL_BUTTON_LEFT)b=gde::LEFT;
+  if(event.button.button == SDL_BUTTON_MIDDLE)b=gde::MIDDLE;
+  if(event.button.button == SDL_BUTTON_RIGHT)b=gde::RIGHT;
   if(DOWN)
     app->editor->mouseButtonDown(b,event.button.x,app->window->getHeight()-event.button.y-1);
   else

@@ -2,6 +2,7 @@
 
 #include<Draw2DShaders.h>
 #include<CreateFontTexture.h>
+#include<GDEButton.h>
 
 using namespace ge::gl;
 
@@ -154,7 +155,7 @@ void Edit::drawViewport(std::shared_ptr<Viewport2d>const&viewport,glm::mat3 cons
     gl.glStencilFunc(GL_EQUAL,1,0xff);
     //gl.glEnable(GL_DEPTH_TEST);
     gl.glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
-    this->drawLayer(x,viewMatrix*model,projection);
+    this->drawLayer(x,model,projection*viewMatrix);
   }
 }
 
@@ -417,10 +418,10 @@ bool Edit::mouseMotionViewport(std::shared_ptr<Viewport2d>const&viewport,glm::ve
   auto matrix = glm::inverse(viewRotation*viewTranslate*viewScale);
   glm::vec2 newDiff = glm::vec2(matrix*glm::vec3(diff,0.f));
   glm::vec2 newPos  = glm::vec2(matrix*glm::vec3(pos,1.f));
+  glm::vec2 lastPos = newPos-newDiff;
   if(
-      (newPos.x<0.f||newPos.y<0.f||newPos.x>viewport->cameraSize.x||newPos.y>viewport->cameraSize.y)&&
-      (newPos.x-newDiff.x<0.f||newPos.y-newDiff.y<0.f||newPos.x-newDiff.x>viewport->cameraSize.x||newPos.y-newDiff.y>viewport->cameraSize.y)
-      )return false;
+      !rectangleTest(glm::vec2(0.f),viewport->cameraSize,newPos)&&
+      !rectangleTest(glm::vec2(0.f),viewport->cameraSize,lastPos))return false;
   for(int32_t i=viewport->size()-1;i>=0;--i)
     if(this->mouseMotionLayer(viewport->at(i),newDiff,newPos))return true;
   return false;
@@ -442,8 +443,8 @@ bool Edit::mouseMotionNode(std::shared_ptr<Node2d>const&node,glm::vec2 const&dif
     auto v = node->getValues<MouseMotionEvent>();
     for(auto const&x:v){
       auto vv = (MouseMotionEvent*)x;
-      bool lastStatus = lastPos.x>vv->pos.x&&lastPos.y>vv->pos.y&&lastPos.x<=vv->pos.x+vv->size.x&&lastPos.y<=vv->pos.y+vv->size.y;
-      bool status = newPos.x>vv->pos.x&&newPos.y>vv->pos.y&&newPos.x<=vv->pos.x+vv->size.x&&newPos.y<=vv->pos.y+vv->size.y;
+      bool lastStatus = rectangleTest(vv->pos,vv->size,lastPos);
+      bool status = rectangleTest(vv->pos,vv->size,newPos);
       if(vv->type == MouseMotionEvent::MOUSE_EXIT)
         if(!lastStatus || status)continue;
       if(vv->type == MouseMotionEvent::MOUSE_ENTER){
@@ -464,6 +465,61 @@ bool Edit::mouseMotionNode(std::shared_ptr<Node2d>const&node,glm::vec2 const&dif
   }
   for(auto const&x:*node)
     handled |=this->mouseMotionNode(std::dynamic_pointer_cast<Node2d>(x),newDiff,newPos);
+  return handled;
+}
+
+void Edit::mouseButton(bool down,MouseButton const&button,size_t x,size_t y){
+  if(!this->rootViewport)return;
+  this->mouseButtonViewport(
+      this->rootViewport,
+      down,
+      button,
+      glm::vec2(x,y));
+}
+
+bool Edit::mouseButtonViewport(std::shared_ptr<Viewport2d>const&viewport,bool down,MouseButton const&button,glm::vec2 const&pos){
+  if(!viewport)return false;
+  auto viewTranslate = Edit::translate(-viewport->cameraPosition);
+  auto viewRotation = Edit::rotate(viewport->cameraAngle);
+  auto viewScale = Edit::scale(viewport->cameraScale);
+  auto matrix = glm::inverse(viewRotation*viewTranslate*viewScale);
+  glm::vec2 newPos  = glm::vec2(matrix*glm::vec3(pos,1.f));
+  if(!rectangleTest(glm::vec2(0.f),viewport->cameraSize,newPos))return false;
+  for(int32_t i=viewport->size()-1;i>=0;--i)
+    if(this->mouseButtonLayer(viewport->at(i),down,button,newPos))return true;
+  return false;
+}
+
+bool Edit::mouseButtonLayer(std::shared_ptr<Layer>const&layer,bool down,MouseButton const&button,glm::vec2 const&pos){
+  if(!layer)return false;
+  if(!layer->root)return false;
+  return this->mouseButtonNode(std::dynamic_pointer_cast<Node2d>(layer->root),down,button,pos);
+}
+
+bool Edit::mouseButtonNode(std::shared_ptr<Node2d>const&node,bool down,MouseButton const&button,glm::vec2 const&pos){
+  auto matrix = glm::inverse(node->mat);
+  auto newPos = glm::vec2(matrix*glm::vec3(pos,1.f));
+  bool handled = false;
+  if(node->hasValues<MouseButtonEvent>()){
+    auto v = node->getValues<MouseButtonEvent>();
+    for(auto const&x:v){
+      auto vv = (MouseButtonEvent*)x;
+      if(vv->down != down || vv->button != button)continue;
+      if(!rectangleTest(vv->pos,vv->size,newPos))continue;
+      std::cout<<"splnil jsem oblast"<<std::endl;
+      (*vv)(node,newPos);
+      handled = true;
+    }
+  }
+  if(node->hasValues<std::shared_ptr<Viewport2d>>()){
+    auto v = node->getValues<std::shared_ptr<Viewport2d>>();
+    for(auto const&x:v){
+      auto vv = *(std::shared_ptr<Viewport2d>*)x;
+      handled |=this->mouseButtonViewport(vv,down,button,newPos);
+    }
+  }
+  for(auto const&x:*node)
+    handled |=this->mouseButtonNode(std::dynamic_pointer_cast<Node2d>(x),down,button,newPos);
   return handled;
 }
 
