@@ -1,8 +1,8 @@
 #include<limits>
 #include<string>
 #include<geDE/geDE.h>
-#include<geDE/FunctionNodeFactory.h>
-#include<geDE/CompositeFunctionFactory.h>
+//#include<geDE/FunctionNodeFactory.h>
+//#include<geDE/CompositeFunctionFactory.h>
 #include<geUtil/CopyArgumentManager2VariableRegister.h>
 #include<geUtil/ArgumentManager/ArgumentManager.h>
 #include<geCore/Text.h>
@@ -25,6 +25,8 @@
 #include<RegisterMouse.h>
 #include<Functions.h>
 #include<Font.h>
+
+#include<Tester.h>
 
 class AssimpModel{
   public:
@@ -332,23 +334,22 @@ bool Application::init(int argc,char*argv[]){
 
 
 
-
-  this->idleScript = std::make_shared<ge::de::Body>(true);
-  this->idleScript->toBody()->addStatement(
+  auto idleScript = std::make_shared<ge::de::Body>(true);
+  idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("glClear","gl",kernel.createVariable<GLbitfield>(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createFce("assimpLoaderFailsafe","model",kernel.createFce("assimpLoader","modelFileName"),"model"));
 
-  //this->idleScript->toBody()->addStatement(
+  //idleScript->toBody()->addStatement(
   //    kernel.createFce("assimpLoader","modelFileName","model"));
 
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createFce("nofVertices","model","nofModelVertices"));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createFce("assimpModelToVBO","model","modelVertices"));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createFce("assimpModelToNBO","model","modelNormals"));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createFce("VertexArray::addAttrib",
         kernel.createFce("sharedVertexArray2VertexArray*","modelVAO"),
         "modelVertices",
@@ -360,7 +361,7 @@ bool Application::init(int argc,char*argv[]){
         kernel.createVariable<GLboolean>(GL_FALSE),
         kernel.createVariable<GLuint>(0),
         kernel.createVariable<int32_t>(ge::gl::VertexArray::NONE)));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createFce("VertexArray::addAttrib",
         kernel.createFce("sharedVertexArray2VertexArray*","modelVAO"),
         "modelNormals",
@@ -373,73 +374,87 @@ bool Application::init(int argc,char*argv[]){
         kernel.createVariable<GLuint>(0),
         kernel.createVariable<int32_t>(ge::gl::VertexArray::NONE)));
 
-  auto programStatementIndex = this->idleScript->toBody()->addStatement(
+  auto programStatementIndex = idleScript->toBody()->addStatement(
       kernel.createFce("createVSFSProgram","program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("VertexArray::bind",kernel.createFce("sharedVertexArray2VertexArray*","modelVAO")));
-  this->idleScript->toBody()->addStatement(kernel.createFce("cameraAddXRotation",
+  idleScript->toBody()->addStatement(kernel.createFce("cameraAddXRotation",
         "camera.rotX","camera.sensitivity","mouse.yrel","window.height","camera.fovy","camera.aspect","mouse.left","camera.rotX"));
-  this->idleScript->toBody()->addStatement(kernel.createFce("cameraAddYRotation",
+  idleScript->toBody()->addStatement(kernel.createFce("cameraAddYRotation",
         "camera.rotY","camera.sensitivity","mouse.xrel","window.width","camera.fovy","camera.aspect","mouse.left","camera.rotY"));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("clearMouseRel","mouse.xrel"));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("clearMouseRel","mouse.yrel"));
-  this->idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
+  idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(-3),"keyboard.W","camera.position"));
-  this->idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
+  idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(+3),"keyboard.S","camera.position"));
-  this->idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
+  idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(-1),"keyboard.A","camera.position"));
-  this->idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
+  idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(+1),"keyboard.D","camera.position"));
-  this->idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
+  idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(+2),"keyboard.Space","camera.position"));
-  this->idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
+  idleScript->toBody()->addStatement(kernel.createFce("cameraMove",
         "camera.viewRotation","camera.position","camera.speed",kernel.createVariable<int32_t>(-2),"keyboard.Left Shift","camera.position"));
-  this->idleScript->toBody()->addStatement(kernel.createFce("computeViewRotation",
+  idleScript->toBody()->addStatement(kernel.createFce("computeViewRotation",
         "camera.rotX","camera.rotY","camera.rotZ","camera.viewRotation"));
-  this->idleScript->toBody()->addStatement(kernel.createFce("computeView",
+  idleScript->toBody()->addStatement(kernel.createFce("computeView",
         "camera.viewRotation","camera.position","camera.view"));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createFce("computeAspectRatio","window.width","window.height","camera.aspect"));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createFce("computeProjection","camera.fovy","camera.aspect","camera.near","camera.far","camera.projection"));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("glViewport",
         "gl",
         kernel.createVariable<GLint>(0),
         kernel.createVariable<GLint>(0),
         kernel.createFce("cast<u32,i32>","window.width"),
         kernel.createFce("cast<u32,i32>","window.height")));
-  this->idleScript->toBody()->addStatement(
-      kernel.createAlwaysExecFce("Program::use",kernel.createFce("sharedProgram2Program*",this->idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData())));
-  this->idleScript->toBody()->addStatement(kernel.createFce("Program::set3fv",
-        kernel.createFce("sharedProgram2Program*",this->idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("Program::use",kernel.createFce("sharedProgram2Program*",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData())));
+  idleScript->toBody()->addStatement(kernel.createFce("Program::set3fv",
+        kernel.createFce("sharedProgram2Program*",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("position"),
         kernel.createFce("f32[3]2f32*","camera.position"),
         kernel.createVariable<GLsizei>(1)
         ));
-  this->idleScript->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
-        kernel.createFce("sharedProgram2Program*",this->idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
+  idleScript->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
+        kernel.createFce("sharedProgram2Program*",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("projection"),
         kernel.createFce("f32[16]2f32*","camera.projection"),
         kernel.createVariable<GLsizei>(1),
         kernel.createVariable<GLboolean>(GL_FALSE)
         ));
-  this->idleScript->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
-        kernel.createFce("sharedProgram2Program*",this->idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
+  idleScript->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
+        kernel.createFce("sharedProgram2Program*",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("view"),
         kernel.createFce("f32[16]2f32*","camera.view"),
         kernel.createVariable<GLsizei>(1),
         kernel.createVariable<GLboolean>(GL_FALSE)
         ));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("glDrawArrays","gl",kernel.createVariable<GLenum>(GL_TRIANGLES),kernel.createVariable<GLint>(0),"nofModelVertices"));
-  this->idleScript->toBody()->addStatement(
+  idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("VertexArray::unbind",kernel.createFce("sharedVertexArray2VertexArray*","modelVAO")));
-  this->idleScript->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
-  this->idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("Timer::elapsedFromStart","timer","time"));
+  idleScript->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
+  idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("Timer::elapsedFromStart","timer","time"));
+
+  this->idleScript = std::make_shared<Tester>(kernel.variableRegister,idleScript,"camera.fovy",std::vector<std::shared_ptr<ge::de::Resource>>({
+      kernel.createVariable<float>(1.0f*glm::half_pi<float>()),
+      kernel.createVariable<float>(1.1f*glm::half_pi<float>()),
+      kernel.createVariable<float>(1.2f*glm::half_pi<float>()),
+      kernel.createVariable<float>(1.3f*glm::half_pi<float>()),
+      kernel.createVariable<float>(1.4f*glm::half_pi<float>()),
+      kernel.createVariable<float>(1.5f*glm::half_pi<float>()),
+      kernel.createVariable<float>(1.6f*glm::half_pi<float>()),
+      kernel.createVariable<float>(1.7f*glm::half_pi<float>()),
+      kernel.createVariable<float>(1.8f*glm::half_pi<float>()),
+      kernel.createVariable<float>(1.9f*glm::half_pi<float>()),
+        }));
+  //this->idleScript = idleScript;
 
   this->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister,kernel.nameRegister);
 
@@ -458,15 +473,15 @@ int main(int argc,char*argv[]){
 
 void Application::idle(void*d){
   auto app = (Application*)d;
-  //(*app->idleScript)();
-  //TwDraw();
-  app->editor->draw();
+  (*app->idleScript)();
+  TwDraw();
+  //app->editor->draw();
   //app->draw2D->draw();
   app->window->swap();
 }
 
 bool Application::eventHandler(SDL_Event const&event,void*){
-  return false;
+  //return false;
   bool handledByAnt = TwEventSDL(&event,SDL_MAJOR_VERSION,SDL_MINOR_VERSION);
   if(handledByAnt)return true;
   return false;

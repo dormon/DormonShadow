@@ -72,48 +72,55 @@ class MouseButtonEvent{
 class MouseMotionEvent{
   public:
     enum Type{
-      MOUSE_ENTER,
-      MOUSE_EXIT,
-      MOUSE_MOVE,
+      MOUSE_ENTER_BIT = 1<<0,
+      MOUSE_EXIT_BIT  = 1<<1,
+      MOUSE_MOVE_BIT  = 1<<2,
     };
     std::function<void(std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&)>callback = nullptr;
     std::shared_ptr<void>userData;
     glm::vec2 pos;
     glm::vec2 size;
-    Type type;
+    uint32_t type;
     MouseMotionEvent(
         glm::vec2 const&p,
         glm::vec2 const&s,
         std::function<void(std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&)>const&c,
         std::shared_ptr<void>const&data = nullptr,
-        Type const&t = MOUSE_MOVE):callback(c),userData(data),pos(p),size(s),type(t){}
+        uint32_t const&t = MOUSE_MOVE_BIT):callback(c),userData(data),pos(p),size(s),type(t){}
     MouseMotionEvent(
         std::function<void(std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&)>const&c,
         std::shared_ptr<void>const&data = nullptr,
-        Type const&t = MOUSE_MOVE):MouseMotionEvent(glm::vec2(0.f),glm::vec2(0.f),c,data,t){}
+        uint32_t const&t = MOUSE_MOVE_BIT):MouseMotionEvent(glm::vec2(0.f),glm::vec2(0.f),c,data,t){}
     MouseMotionEvent(
         std::function<void(std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&)>const&c,
         std::shared_ptr<void>const&data = nullptr,
-        Type const&t = MOUSE_MOVE):MouseMotionEvent(
+        uint32_t const&t = MOUSE_MOVE_BIT):MouseMotionEvent(
           [c](std::shared_ptr<Node2d>const&n,std::shared_ptr<void>const&d,glm::vec2 const&,glm::vec2 const&){c(n,d);},data,t){}
     MouseMotionEvent(
         std::function<void(std::shared_ptr<void>const&)>const&c,
         std::shared_ptr<void>const&data = nullptr,
-        Type const&t = MOUSE_MOVE):MouseMotionEvent(
+        uint32_t const&t = MOUSE_MOVE_BIT):MouseMotionEvent(
           [c](std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&d,glm::vec2 const&,glm::vec2 const&){c(d);},data,t){}
     MouseMotionEvent(
         std::function<void(void*)>const&c,
         void*data = nullptr,
-        Type const&t = MOUSE_MOVE):MouseMotionEvent(
+        uint32_t const&t = MOUSE_MOVE_BIT):MouseMotionEvent(
           [c](std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&d,glm::vec2 const&,glm::vec2 const&){c(*(void**)d.get());},std::make_shared<void*>(data),t){}
+    MouseMotionEvent(
+        std::function<void(void*,glm::vec2 const&)>const&c,
+        void*data = nullptr,
+        uint32_t const&t = MOUSE_MOVE_BIT):MouseMotionEvent(
+          [c](std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&d,glm::vec2 const&diff,glm::vec2 const&){c(*(void**)d.get(),diff);},std::make_shared<void*>(data),t){}
+
+
 
     MouseMotionEvent(
         std::function<void(std::shared_ptr<Node2d>const&)>const&c,
-        Type const&t = MOUSE_MOVE):MouseMotionEvent(
+        uint32_t const&t = MOUSE_MOVE_BIT):MouseMotionEvent(
           [c](std::shared_ptr<Node2d>const&n,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&){c(n);},nullptr,t){}
     MouseMotionEvent(
         std::function<void()>const&c,
-        Type const& t = MOUSE_MOVE):MouseMotionEvent(
+        uint32_t const& t = MOUSE_MOVE_BIT):MouseMotionEvent(
           [c](std::shared_ptr<Node2d>const&,std::shared_ptr<void>const&,glm::vec2 const&,glm::vec2 const&){c();},nullptr,t){}
     void operator()(std::shared_ptr<Node2d>const&node,glm::vec2 const&diff,glm::vec2 const&pos){
       assert(this->callback!=nullptr);

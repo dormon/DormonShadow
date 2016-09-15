@@ -15,6 +15,7 @@ class Node: public std::vector<std::shared_ptr<Node>>, public AllContainer{
         std::function<void(Node*,void*)>const&atExit = nullptr,
         void*data = nullptr);
     Node*parent = nullptr;
+    virtual void pushNode(std::shared_ptr<Node>const&n);
 };
 
 inline Node::Node(Node*p):parent(p){}
@@ -37,4 +38,10 @@ inline void Node::visitor(
   if(atExit)atExit(this,data);
 }
 
+inline void Node::pushNode(std::shared_ptr<Node>const&n){
+  assert(this!=nullptr);
+  assert(n!=nullptr);
+  this->push_back(n);
+  n->parent = this;
+}
 

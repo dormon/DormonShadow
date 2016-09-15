@@ -119,6 +119,7 @@ class Function{
       this->functionName = fce;
       this->inputNames = inputs;
       this->outputName = output;
+      this->create();
     }
     ui::Element*root = nullptr;
     std::shared_ptr<Node2d>node = nullptr;
@@ -129,7 +130,8 @@ class Function{
     size_t id = 0;
     void setLineColor(glm::vec4 const&color = glm::vec4(1.f));
     glm::vec2 grabedPosition;
-    void move(glm::vec2 const&mousePosition);
+    bool doMove = false;
+    void move(glm::vec2 const&mouseDiff);
 };
 
 
@@ -168,7 +170,10 @@ void Function::create(){
             },{
             newData<Triangle>(0,0,1,0,1,1,captionBackgrounColor),
             newData<Triangle>(0,0,1,1,0,1,captionBackgrounColor),
-            newData<MouseButtonEvent>([](){std::cout<<"klikam"<<std::endl;}),
+            //newData<MouseMotionEvent>([](void*ptr,glm::vec2 const&diff){((Function*)ptr)->move(diff);},this),
+            newData<MouseMotionEvent>([](void*ptr,glm::vec2 const&diff){((Function*)ptr)->move(diff);},this,MouseMotionEvent::MOUSE_EXIT_BIT|MouseMotionEvent::MOUSE_MOVE_BIT),
+            newData<MouseButtonEvent>([](void*ptr){((Function*)ptr)->doMove = true;std::cout<<"klikam"<<std::endl;},this,true,MouseButton::LEFT),
+            newData<MouseButtonEvent>([](void*ptr){((Function*)ptr)->doMove = false;std::cout<<"klikam"<<std::endl;},this,false,MouseButton::LEFT),
             }),
           new Rectangle(0,lineWidth,{newData<Line>(0,.5,1,.5,lineWidth,lineColor)}),//caption line
           new Split(0,{
@@ -205,8 +210,8 @@ void Function::create(){
       }),
       new Rectangle(0,lineWidth,{newData<Line>(0,.5,1,.5,lineWidth,lineColor)}),//bottom line
   },{
-    newData<MouseMotionEvent>([](void*ptr){((Function*)ptr)->setLineColor();},this,MouseMotionEvent::MOUSE_ENTER),
-    newData<MouseMotionEvent>([](void*ptr){((Function*)ptr)->setLineColor(glm::vec4(0.f,1.f,0.f,1.f));},this,MouseMotionEvent::MOUSE_EXIT),
+    newData<MouseMotionEvent>([](void*ptr){((Function*)ptr)->setLineColor();},this,MouseMotionEvent::MOUSE_ENTER_BIT),
+    newData<MouseMotionEvent>([](void*ptr){((Function*)ptr)->setLineColor(glm::vec4(0.f,1.f,0.f,1.f));},this,MouseMotionEvent::MOUSE_EXIT_BIT),
   });
   root->getSize();
 
@@ -229,26 +234,31 @@ void Function::setLineColor(glm::vec4 const&color){
   *this->node->getNamedValue<bool>("dataChanged") = true;
 }
 
+void Function::move(glm::vec2 const&diff){
+  assert(this!=nullptr);
+  assert(this->node!=nullptr);
+  if(!this->doMove)return;
+  this->node->mat *= Edit::translate(diff); 
+}
+
 class gde::EditorImpl{
   public:
     EditorImpl(ge::gl::Context const&g,glm::uvec2 const&size):gl(g){
-      this->testFce = new Function("addSome",{"valueA","valueB","valueC","val"},"output");
-      this->testFce2 = new Function("computeProjection",{"fovy","aspect","near","far"},"projection");
-      this->testFce->create();
-      this->testFce2->create();
+      this->functions.push_back(new Function("addSome",{"valueA","valueB","valueC","val"},"output"));
+      this->functions.push_back(new Function("computeProjection",{"fovy","aspect","near","far"},"projection"));
       this->edit = new Edit(g,size);
-      this->edit->functionsNode->push_back(this->testFce->node);
-      this->testFce->node->parent = &*this->edit->functionsNode;
-      this->edit->functionsNode->push_back(this->testFce2->node);
-      this->testFce2->node->parent = &*this->edit->functionsNode;
-      this->testFce2->node->mat = Edit::translate(glm::vec2(100,100));
+      this->edit->functionsNode->pushNode(this->functions[0]->node);
+      this->edit->functionsNode->pushNode(this->functions[1]->node);
+      this->functions[1]->node->mat = Edit::translate(glm::vec2(100,100));
       //this->testFce->root->visitor(addToNode2,&*this->edit->functionsNode);
       //this->testFce->root->visitor(addMouseMotionEventToNode,&*this->edit->functionsNode);
     }
     Edit*edit;
-    Function*testFce;
-    Function*testFce2;
-    ~EditorImpl(){delete this->testFce;delete this->testFce2;delete this->edit;}
+    std::vector<Function*>functions;
+    ~EditorImpl(){
+      for(auto const&x:this->functions)
+        delete x;
+    }
     ge::gl::Context const&gl;
     bool mouseButtons[3] = {false,false,false};
 };

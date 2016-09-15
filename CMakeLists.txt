@@ -23,6 +23,7 @@ set(INCLUDES
   include/GDEImpl.h
   include/GDEButton.h
   include/Primitives.h
+  include/Tester.h
   )
 
 set(SOURCES
@@ -36,6 +37,7 @@ set(SOURCES
   src/UI.cpp
   src/CreateFontTexture.cpp
   src/GDEImpl.cpp
+  src/Tester.cpp
   )
 
 include_directories(include /usr/local/include)
