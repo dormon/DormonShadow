@@ -8,6 +8,7 @@ set(INCLUDES
   include/RegisterKeyboard.h
   include/RegisterMouse.h
   include/Functions.h
+  include/Camera.h
   include/Font.h
   include/Draw2D.h
   include/Draw2DShaders.h
@@ -32,6 +33,7 @@ set(SOURCES
   src/RegisterKeyboard.cpp
   src/RegisterMouse.cpp
   src/Functions.cpp
+  src/Camera.cpp
   src/Draw2D.cpp
   src/GEDEEditor.cpp
   src/UI.cpp

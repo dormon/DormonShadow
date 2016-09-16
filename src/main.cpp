@@ -23,23 +23,13 @@
 #include<main.h>
 #include<RegisterKeyboard.h>
 #include<RegisterMouse.h>
+
+#include<Camera.h>
 #include<Functions.h>
+
 #include<Font.h>
 
 #include<Tester.h>
-
-class WindowSwap{
-  public:
-    WindowSwap(){}
-    WindowSwap(ge::ad::SDLWindow*w):window(w){}
-    ~WindowSwap(){}
-    ge::ad::SDLWindow*window = nullptr;
-    void swap(){
-      assert(this!=nullptr);
-      assert(this->window!=nullptr);
-      this->window->swap();
-    }
-};
 
 class AssimpModel{
   public:
@@ -57,6 +47,10 @@ class AssimpModel{
 };
 
 int32_t nofVertices(std::shared_ptr<AssimpModel>const&mdl){
+  if(mdl==nullptr){
+    ge::core::printError(GE_CORE_FCENAME,"mdl is nullptr!");
+    return 0;
+  }
   auto model = mdl->model;
   size_t vertices=0;
   std::vector<float>vertData;
@@ -66,6 +60,10 @@ int32_t nofVertices(std::shared_ptr<AssimpModel>const&mdl){
 } 
 
 std::shared_ptr<ge::gl::Buffer>assimpModelToVBO(std::shared_ptr<AssimpModel>const&mdl){
+  if(mdl==nullptr){
+    ge::core::printError(GE_CORE_FCENAME,"mdl is nullptr!");
+    return nullptr;
+  }
   auto model = mdl->model;
   size_t vertices=nofVertices(mdl);
   std::vector<float>vertData;
@@ -81,6 +79,10 @@ std::shared_ptr<ge::gl::Buffer>assimpModelToVBO(std::shared_ptr<AssimpModel>cons
 }
 
 std::shared_ptr<ge::gl::Buffer>assimpModelToNBO(std::shared_ptr<AssimpModel>const&mdl){
+  if(mdl==nullptr){
+    ge::core::printError(GE_CORE_FCENAME,"mdl is nullptr!");
+    return nullptr;
+  }
   auto model = mdl->model;
   size_t vertices=nofVertices(mdl);
   std::vector<float>vertData;
@@ -98,13 +100,8 @@ std::shared_ptr<ge::gl::Buffer>assimpModelToNBO(std::shared_ptr<AssimpModel>cons
 namespace ge{
   namespace de{
     template<>inline std::string keyword<std::shared_ptr<AssimpModel>>(){return"SharedAssimpModel";}
-    template<>inline std::string keyword<glm::vec3>(){return ge::de::keyword<float[3]>();}
-    template<>inline std::string keyword<glm::vec4>(){return ge::de::keyword<float[4]>();}
-    template<>inline std::string keyword<glm::mat3>(){return ge::de::keyword<float[3][3]>();}
-    template<>inline std::string keyword<glm::mat4>(){return ge::de::keyword<float[4][4]>();}
     template<>inline std::string keyword<ge::gl::Context>(){return"GL";}
     template<>inline std::string keyword<ge::util::Timer<float>>(){return"Timer";}
-    template<>inline std::string keyword<WindowSwap>(){return"WindowSwap";}
     template<>inline std::string keyword<ge::ad::SDLWindow>(){return"SDLWindow";}
   }
 }
@@ -127,46 +124,9 @@ bool assimpLoaderFailsafeTrigger(std::shared_ptr<AssimpModel>const&l,std::shared
   return n!=nullptr && l!=n;
 }
 
-glm::mat4 computeViewRotation(float rx,float ry,float rz){
-  return
-    glm::rotate(glm::mat4(1.f),rz,glm::vec3(0.f,0.f,1.f))*
-    glm::rotate(glm::mat4(1.f),rx,glm::vec3(1.f,0.f,0.f))*
-    glm::rotate(glm::mat4(1.f),ry,glm::vec3(0.f,1.f,0.f));
-}
-
-glm::mat4 computeView(glm::mat4 const&viewRotation,glm::vec3 const&pos){
-  return viewRotation*glm::translate(glm::mat4(1.f),-pos);
-}
-
-bool cameraMoveTrigger(glm::mat4 const&,glm::vec3 const&,float,int32_t,bool trigger){
-  return trigger;
-}
-
-glm::vec3 cameraMove(glm::mat4 const&viewRotation,glm::vec3 const&pos,float speed,int32_t direction,bool){
-  return pos+glm::sign(direction)*speed*glm::vec3(glm::row(viewRotation,glm::abs(direction)-1));
-}
-
-float cameraAddXRotation(float angle,float sensitivity,int32_t rel,uint32_t height,float fovy,float aspect,bool trigger){
-  if(!trigger)return angle;
-  (void)aspect;
-  angle+=sensitivity*fovy*(float)rel/(float)height;
-  //angle+=rel*sensitivity;
-  return glm::clamp(angle,-glm::half_pi<float>(),glm::half_pi<float>());
-}
-
-float cameraAddYRotation(float angle,float sensitivity,int32_t rel,uint32_t width,float fovy,float aspect,bool trigger){
-  if(!trigger)return angle;
-  return angle+sensitivity*fovy*aspect*(float)rel/(float)width;
-  //return angle+rel*sensitivity;
-}
-
 int32_t clearMouseRel(){return 0;}
 
 uint32_t incrementFrameCounter(uint32_t counter){return counter+1;}
-
-float computeAspectRatio(uint32_t w,uint32_t h){
-  return (float)w/(float)h;
-}
 
 template<typename FROM,typename TO>
 TO cast(FROM const&a);
@@ -208,37 +168,6 @@ bool Application::init(int argc,char*argv[]){
   TwWindowSize(this->window->getWidth(),this->window->getHeight());
 
   this->editor = std::make_shared<gde::Editor>(*this->gl,glm::uvec2(this->window->getWidth(),this->window->getHeight()));
-  /*
-  this->draw2D = std::make_shared<Draw2D>(*this->gl);
-  auto vv=this->draw2D->createViewport(glm::uvec2(this->window->getWidth(),this->window->getHeight()));
-  auto ll=this->draw2D->createLayer();
-  auto nn=this->draw2D->createNode(Draw2D::translate(glm::vec2(100,100)));
-  auto nn2 =this->draw2D->createNode(Draw2D::translate(glm::vec2(300,300)));
-  auto nn3 = this->draw2D->createNode(Draw2D::translate(glm::vec2(100,100)));
-  this->draw2D->insertNode(nn2,nn);
-  this->draw2D->insertNode(nn3,nn);
-  this->draw2D->insertNode(nn2,nn3);
-  //auto ll2=this->draw2D->createLayer();
-  this->draw2D->insertLayer(vv,ll);
-  this->draw2D->setLayerNode(ll,nn2);
-  this->draw2D->setRootViewport(vv);
-  //this->draw2D->insertNode(nn2,nn);
-  //this->draw2D->setLayerNode(ll2,nn2);
-  //this->draw2D->insertLayer(vv,ll2);
-  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(0,0),glm::vec2(100,100),1,glm::vec4(0,1,0,1))));
-  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Line>(glm::vec2(100,100),glm::vec2(-100,300),2,glm::vec4(1,1,0,1))));
-  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Point>(glm::vec2(-30,-50),10,glm::vec4(0,1,1,1))));
-  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Point>(glm::vec2(300,-40),1,glm::vec4(1,0,0,1))));
-  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Circle>(glm::vec2(-200,40),40,2,glm::vec4(1,0,0,1))));
-  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Circle>(glm::vec2(0,0),20,4,glm::vec4(1,1,1,1))));
-  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Triangle>(glm::vec2(-12,32),glm::vec2(120,33),glm::vec2(-66,-66),glm::vec4(0,.5,0,.5))));
-  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Spline>(glm::vec2(0,0),glm::vec2(100,100),glm::vec2(-100,100),glm::vec2(-200,-300),1,glm::vec4(1,0,0,1))));
-  this->draw2D->insertPrimitive(nn,this->draw2D->createPrimitive(std::make_shared<Text>("int main(int argc,char*argv[]){return EXIT_SUCCESS;}",8,glm::vec2(-50,-20),glm::vec2(2,1),glm::vec4(1,1,1,1))));
-
-  this->testFce = new gde::Function(this->draw2D,"addSome",{"valueA","valueB","valueC","val"},"output");
-  this->testFce->create();
-  this->draw2D->insertNode(nn2,this->testFce->node);
-  */
 
   kernel.typeRegister->addType<float*>();
   kernel.addAtomicType(
@@ -250,14 +179,11 @@ bool Application::init(int argc,char*argv[]){
 
   kernel.addAtomicClass<ge::gl::Context>("GL");
 
-  kernel.addAtomicClass<WindowSwap>();
   kernel.addAtomicClass<ge::ad::SDLWindow>();
   kernel.typeRegister->addType<ge::ad::SDLWindow*>();
 
   //script part
-  kernel.addArrayType("vec3",3,"f32");
-  kernel.addArrayType("mat4",16,"f32");
-  kernel.addArrayType(ge::de::keyword<float[16]>(),16,"f32");
+  registerCameraPlugin(&kernel);
   registerPlugin(&kernel);
   kernel.addFunction("assimpLoader",{"fileName","assimpModel"},assimpLoader);
   kernel.addFunction("assimpLoaderFailsafe",{"last","new","lastOrNew"},assimpLoaderFailsafe,assimpLoaderFailsafeTrigger);
@@ -299,7 +225,7 @@ bool Application::init(int argc,char*argv[]){
   kernel.addVariable("camera.speed"          ,0.01f);
   kernel.addVariable("camera.sensitivity"    ,3.0f);
   kernel.addVariable("shaderDirectory"       ,std::string("shaders/"));
-  kernel.addVariable("modelFileName"         ,std::string("/media/windata/ft/prace/models/cube/cube.obj"));
+  kernel.addVariable("modelFileName"         ,std::string("/media/windata/ft/prace/models/cube/cube.obja"));
   kernel.addEmptyVariable("model","SharedAssimpModel");
   kernel.addEmptyVariable("modelVertices","SharedBuffer");
   kernel.addEmptyVariable("modelNormals","SharedBuffer");
@@ -308,7 +234,6 @@ bool Application::init(int argc,char*argv[]){
   kernel.addVariable("gl"                    ,ge::gl::Context{});
   kernel.addVariable("frameCounter"          ,(uint32_t)0);
   kernel.addEmptyVariable("timer","Timer");
-  kernel.addVariable("windowSwap"            ,WindowSwap(&*this->window));
   kernel.addVariable("sdlwindow"             ,&*this->window);
   kernel.addVariable("time"                  ,0.0f);
   kernel.addVariable("frameTime"             ,0.0f);
@@ -322,17 +247,9 @@ bool Application::init(int argc,char*argv[]){
   kernel.addFunction("glDrawArrays"         ,{"mode","first","count"},&ge::gl::Context::glDrawArrays);
   kernel.addFunction("glClear"              ,{"mask"},&ge::gl::Context::glClear);
   kernel.addFunction("glViewport"           ,{"mask"},&ge::gl::Context::glViewport);
-  kernel.addFunction("computeAspectRatio"   ,{"width","height","aspect"},computeAspectRatio);
-  kernel.addFunction("computeProjection"    ,{"fovy","aspect","near","far","projectionMatrix"},glm::perspective<float>);
-  kernel.addFunction("computeViewRotation"  ,{"rotx","roty","rotz","viewRotation"},computeViewRotation);
-  kernel.addFunction("computeView"          ,{"viewRotation","position","viewMatrix"},computeView);
-  kernel.addFunction("cameraMove"           ,{"viewRotation","position","speed","direction","trigger","position"},cameraMove,cameraMoveTrigger);
-  kernel.addFunction("cameraAddXRotation"   ,{"angle","sensitivity","rel","height","fovy","aspect","trigger","angle"},cameraAddXRotation);
-  kernel.addFunction("cameraAddYRotation"   ,{"angle","sensitivity","rel","width","fovy","aspect","trigger","angle"},cameraAddYRotation);
   kernel.addFunction("clearMouseRel"        ,{"zero"},clearMouseRel);
   kernel.addFunction("incrementFrameCounter",{"counter","counter"},incrementFrameCounter);
   kernel.addFunction("cast<u32,i32>",{"u32","i32"},cast<uint32_t,int32_t>);
-  kernel.addFunction("WindowSwap::swap",{"windowSwap"},&WindowSwap::swap);
   kernel.addFunction("SDLWindow::swap",{"sdlwindow"},&ge::ad::SDLWindow::swap);
   {
     auto a = kernel.createFunctionNodeFactory("shaderSourceLoader");
@@ -464,10 +381,11 @@ bool Application::init(int argc,char*argv[]){
       kernel.createAlwaysExecFce("VertexArray::unbind",kernel.createFce("sharedVertexArray2VertexArray*","modelVAO")));
   idleScript->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
   idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("Timer::elapsedFromStart","timer","time"));
-  //idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("WindowSwap::swap","windowSwap"));
   idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("SDLWindow::swap","sdlwindow"));
 
-  this->idleScript = std::make_shared<Tester>(kernel.variableRegister,idleScript,"camera.fovy",std::vector<std::shared_ptr<ge::de::Resource>>({
+  this->idleScript = std::make_shared<Tester>(kernel.variableRegister,idleScript,
+      std::vector<std::string>({"camera.fovy"}),
+      std::vector<std::shared_ptr<ge::de::Resource>>({
       kernel.createVariable<float>(1.0f*glm::half_pi<float>()),
       kernel.createVariable<float>(1.1f*glm::half_pi<float>()),
       kernel.createVariable<float>(1.2f*glm::half_pi<float>()),
