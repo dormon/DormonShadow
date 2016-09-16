@@ -28,6 +28,19 @@
 
 #include<Tester.h>
 
+class WindowSwap{
+  public:
+    WindowSwap(){}
+    WindowSwap(ge::ad::SDLWindow*w):window(w){}
+    ~WindowSwap(){}
+    ge::ad::SDLWindow*window = nullptr;
+    void swap(){
+      assert(this!=nullptr);
+      assert(this->window!=nullptr);
+      this->window->swap();
+    }
+};
+
 class AssimpModel{
   public:
     aiScene const*model = nullptr;
@@ -91,6 +104,8 @@ namespace ge{
     template<>inline std::string keyword<glm::mat4>(){return ge::de::keyword<float[4][4]>();}
     template<>inline std::string keyword<ge::gl::Context>(){return"GL";}
     template<>inline std::string keyword<ge::util::Timer<float>>(){return"Timer";}
+    template<>inline std::string keyword<WindowSwap>(){return"WindowSwap";}
+    template<>inline std::string keyword<ge::ad::SDLWindow>(){return"SDLWindow";}
   }
 }
 
@@ -235,6 +250,10 @@ bool Application::init(int argc,char*argv[]){
 
   kernel.addAtomicClass<ge::gl::Context>("GL");
 
+  kernel.addAtomicClass<WindowSwap>();
+  kernel.addAtomicClass<ge::ad::SDLWindow>();
+  kernel.typeRegister->addType<ge::ad::SDLWindow*>();
+
   //script part
   kernel.addArrayType("vec3",3,"f32");
   kernel.addArrayType("mat4",16,"f32");
@@ -289,6 +308,8 @@ bool Application::init(int argc,char*argv[]){
   kernel.addVariable("gl"                    ,ge::gl::Context{});
   kernel.addVariable("frameCounter"          ,(uint32_t)0);
   kernel.addEmptyVariable("timer","Timer");
+  kernel.addVariable("windowSwap"            ,WindowSwap(&*this->window));
+  kernel.addVariable("sdlwindow"             ,&*this->window);
   kernel.addVariable("time"                  ,0.0f);
   kernel.addVariable("frameTime"             ,0.0f);
   kernel.addVariable("fps"                   ,0.0f);
@@ -311,6 +332,8 @@ bool Application::init(int argc,char*argv[]){
   kernel.addFunction("clearMouseRel"        ,{"zero"},clearMouseRel);
   kernel.addFunction("incrementFrameCounter",{"counter","counter"},incrementFrameCounter);
   kernel.addFunction("cast<u32,i32>",{"u32","i32"},cast<uint32_t,int32_t>);
+  kernel.addFunction("WindowSwap::swap",{"windowSwap"},&WindowSwap::swap);
+  kernel.addFunction("SDLWindow::swap",{"sdlwindow"},&ge::ad::SDLWindow::swap);
   {
     auto a = kernel.createFunctionNodeFactory("shaderSourceLoader");
     auto b = kernel.createFunctionNodeFactory("shaderSourceLoader");
@@ -441,6 +464,8 @@ bool Application::init(int argc,char*argv[]){
       kernel.createAlwaysExecFce("VertexArray::unbind",kernel.createFce("sharedVertexArray2VertexArray*","modelVAO")));
   idleScript->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
   idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("Timer::elapsedFromStart","timer","time"));
+  //idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("WindowSwap::swap","windowSwap"));
+  idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("SDLWindow::swap","sdlwindow"));
 
   this->idleScript = std::make_shared<Tester>(kernel.variableRegister,idleScript,"camera.fovy",std::vector<std::shared_ptr<ge::de::Resource>>({
       kernel.createVariable<float>(1.0f*glm::half_pi<float>()),
@@ -454,7 +479,7 @@ bool Application::init(int argc,char*argv[]){
       kernel.createVariable<float>(1.8f*glm::half_pi<float>()),
       kernel.createVariable<float>(1.9f*glm::half_pi<float>()),
         }));
-  //this->idleScript = idleScript;
+  this->idleScript = idleScript;
 
   this->variableManipulator = std::make_shared<VariableRegisterManipulator>(kernel.variableRegister,kernel.nameRegister);
 
@@ -474,10 +499,10 @@ int main(int argc,char*argv[]){
 void Application::idle(void*d){
   auto app = (Application*)d;
   (*app->idleScript)();
-  TwDraw();
+  //TwDraw();
   //app->editor->draw();
   //app->draw2D->draw();
-  app->window->swap();
+  //app->window->swap();
 }
 
 bool Application::eventHandler(SDL_Event const&event,void*){
