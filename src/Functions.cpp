@@ -106,6 +106,7 @@ void registerPlugin(Kernel*kernel){
 
   kernel->addFunction("cast<SharedProgram,Program*>"        ,{"sharedProgram"    ,"program*"    },sharedPointerToPointer<ge::gl::Program    >);
   kernel->addFunction("cast<SharedVertexArray,VertexArray*>",{"sharedVertexArray","vertexArray*"},sharedPointerToPointer<ge::gl::VertexArray>);
+  kernel->addFunction("cast<SharedFramebuffer,Framebuffer*>",{"sharedFramebuffer","Framebuffer*"},sharedPointerToPointer<ge::gl::Framebuffer>);
 
   kernel->addFunction("shaderSourceLoader"    ,{"version","defines","dir","fileNames","source"},shaderSourceLoader);
   kernel->addFunction("createVertexShader"    ,{"source","sharedShader"},createShader<GL_VERTEX_SHADER>);

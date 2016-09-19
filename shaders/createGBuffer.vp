@@ -1,3 +1,23 @@
+#if defined(VERTEX_SHADER)
+uniform mat4 projection = mat4(1);
+uniform mat4 view       = mat4(1);
+
+layout(location=0)in vec3 position;
+layout(location=1)in vec3 normal;
+
+out vec3 vPosition;
+out vec3 vNormal;
+
+void main(){
+  gl_Position = projection*view*vec4(position,1);
+  vPosition = position;
+  vNormal   = normal;
+}
+#endif
+
+
+
+#if defined(FRAGMENT_SHADER)
 layout(location=0)out uvec4 fColor;
 layout(location=1)out vec4  fPosition;
 layout(location=2)out vec4  fNormal; 
@@ -6,7 +26,7 @@ in vec3 vPosition;
 in vec3 vNormal;
 
 void main(){
-  vec3  diffuseColor   = vec3(.5,.5,.5,0);
+  vec3  diffuseColor   = vec3(.5,.5,.5);
   vec3  specularColor  = vec3(1);
   vec3  normal         = vNormal;
   float specularFactor = 1;
@@ -17,7 +37,7 @@ void main(){
   color.w      = uint (specularFactor*0xff);
 
   fColor    = color;
-  fPosition = vPosition;
+  fPosition = vec4(vPosition,1);
   fNormal   = vec4(normal,-dot(vPosition,normal));
 }
-
+#endif

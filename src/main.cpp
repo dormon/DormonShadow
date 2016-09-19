@@ -174,10 +174,17 @@ bool Application::init(int argc,char*argv[]){
 
   kernel.addVariable("window.width"          ,this->window->getWidth());
   kernel.addVariable("window.height"         ,this->window->getHeight());
-  kernel.addVariable("program.version"       ,std::string("#version 450\n"));
-  kernel.addVariable("program.vertexShader"  ,std::string("vertex.vp")     );
-  kernel.addVariable("program.fragmentShader",std::string("fragment.fp")   );
-  kernel.addVariable("program.defines"       ,std::string("")              );
+  kernel.addVariable("programs.createGBuffer.version"       ,std::string("#version 450\n"));
+  kernel.addVariable("programs.createGBuffer.vertexShader"  ,std::string("createGBuffer.vp"));
+  kernel.addVariable("programs.createGBuffer.fragmentShader",std::string("createGBuffer.vp"));
+  kernel.addVariable("programs.createGBuffer.vpDefines"     ,std::string("#define VERTEX_SHADER\n"  ));
+  kernel.addVariable("programs.createGBuffer.fpDefines"     ,std::string("#define FRAGMENT_SHADER\n"));
+  kernel.addVariable("programs.drawGBuffer.version"       ,std::string("#version 450\n"));
+  kernel.addVariable("programs.drawGBuffer.vertexShader"  ,std::string("drawGBuffer.vp"));
+  kernel.addVariable("programs.drawGBuffer.fragmentShader",std::string("drawGBuffer.vp"));
+  kernel.addVariable("programs.drawGBuffer.vpDefines"     ,std::string("#define VERTEX_SHADER\n"  ));
+  kernel.addVariable("programs.drawGBuffer.fpDefines"     ,std::string("#define FRAGMENT_SHADER\n"));
+
   kernel.addVariable("camera.position"       ,glm::vec3(0.f));
   kernel.addVariable("camera.fovy"           ,glm::radians<float>(90.f));
   kernel.addVariable("camera.near"           ,1.f);
@@ -192,7 +199,7 @@ bool Application::init(int argc,char*argv[]){
   kernel.addVariable("camera.speed"          ,0.01f);
   kernel.addVariable("camera.sensitivity"    ,3.0f);
   kernel.addVariable("shaderDirectory"       ,std::string("shaders/"));
-  kernel.addVariable("modelFileName"         ,std::string("/media/windata/ft/prace/models/cube/cube.obj"));
+  kernel.addVariable("modelFileName"         ,std::string("/media/dormon/Data/models/o/o.3ds"));//windata/ft/prace/models/cube/cube.obj"));
   kernel.addEmptyVariable("model","SharedAssimpModel");
   kernel.addEmptyVariable("modelVertices","SharedBuffer");
   kernel.addEmptyVariable("modelNormals","SharedBuffer");
@@ -206,6 +213,13 @@ bool Application::init(int argc,char*argv[]){
   kernel.addVariable("frameTime"             ,0.0f);
   kernel.addVariable("fps"                   ,0.0f);
   kernel.addEmptyVariable("stype","ShaderType");
+
+  kernel.addEmptyVariable("deferred.position","SharedTexture");
+  kernel.addEmptyVariable("deferred.normal"  ,"SharedTexture");
+  kernel.addEmptyVariable("deferred.color"   ,"SharedTexture");
+  kernel.addEmptyVariable("deferred.depth"   ,"SharedTexture");
+  kernel.addEmptyVariable("deferred.stencil" ,"SharedTexture");
+  kernel.addVariable     ("deferred.fbo"     ,std::make_shared<ge::gl::Framebuffer>());
   keyboard::registerKeyboard(&kernel);
   mouse::registerMouse(&kernel);
 
@@ -218,6 +232,7 @@ bool Application::init(int argc,char*argv[]){
   kernel.addFunction("incrementFrameCounter",{"counter","counter"},incrementFrameCounter);
   kernel.addFunction("cast<u32,i32>",{"u32","i32"},cast<uint32_t,int32_t>);
   kernel.addFunction("SDLWindow::swap",{"sdlwindow"},&ge::ad::SDLWindow::swap);
+  kernel.addFunction("TwDraw",{},&TwDraw);
   {
     auto a = kernel.createFunctionNodeFactory("shaderSourceLoader");
     auto b = kernel.createFunctionNodeFactory("shaderSourceLoader");
@@ -281,8 +296,25 @@ bool Application::init(int argc,char*argv[]){
         kernel.createVariable<GLuint>(0),
         kernel.createVariable<int32_t>(ge::gl::VertexArray::NONE)));
 
-  auto programStatementIndex = idleScript->toBody()->addStatement(
-      kernel.createFce("createVSFSProgram","program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"));
+  auto createGBufferStatementIndex = idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "createVSFSProgram",
+        "programs.createGBuffer.version",
+        "shaderDirectory",
+        "programs.createGBuffer.vpDefines",
+        "programs.createGBuffer.vertexShader",
+        "programs.createGBuffer.fpDefines",
+        "programs.createGBuffer.fragmentShader"));
+  auto drawGBufferStatementIndex = idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "createVSFSProgram",
+        "programs.drawGBuffer.version",
+        "shaderDirectory",
+        "programs.drawGBuffer.vpDefines",
+        "programs.drawGBuffer.vertexShader",
+        "programs.drawGBuffer.fpDefines",
+        "programs.drawGBuffer.fragmentShader"));
+
   idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("VertexArray::bind",kernel.createFce("cast<SharedVertexArray,VertexArray*>","modelVAO")));
   idleScript->toBody()->addStatement(kernel.createFce("cameraAddXRotation",
@@ -313,6 +345,107 @@ bool Application::init(int argc,char*argv[]){
       kernel.createFce("computeAspectRatio","window.width","window.height","camera.aspect"));
   idleScript->toBody()->addStatement(
       kernel.createFce("computeProjection","camera.fovy","camera.aspect","camera.near","camera.far","camera.projection"));
+
+  idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "createTexture",
+        kernel.createVariable<GLenum>(GL_TEXTURE_2D),
+        kernel.createVariable<GLenum>(GL_RGBA32F),
+        kernel.createVariable<GLsizei>(1),
+        kernel.createFce("cast<u32,i32>","window.width"),
+        kernel.createFce("cast<u32,i32>","window.height"),
+        kernel.createVariable<GLsizei>(0),
+        "deferred.position"));
+  idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "createTexture",
+        kernel.createVariable<GLenum>(GL_TEXTURE_2D),
+        kernel.createVariable<GLenum>(GL_RGBA32F),
+        kernel.createVariable<GLsizei>(1),
+        kernel.createFce("cast<u32,i32>","window.width"),
+        kernel.createFce("cast<u32,i32>","window.height"),
+        kernel.createVariable<GLsizei>(0),
+        "deferred.normal"));
+  idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "createTexture",
+        kernel.createVariable<GLenum>(GL_TEXTURE_2D),
+        kernel.createVariable<GLenum>(GL_RGBA16UI),
+        kernel.createVariable<GLsizei>(1),
+        kernel.createFce("cast<u32,i32>","window.width"),
+        kernel.createFce("cast<u32,i32>","window.height"),
+        kernel.createVariable<GLsizei>(0),
+        "deferred.color"));
+  idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "createTexture",
+        kernel.createVariable<GLenum>(GL_TEXTURE_RECTANGLE),
+        kernel.createVariable<GLenum>(GL_DEPTH24_STENCIL8),
+        kernel.createVariable<GLsizei>(1),
+        kernel.createFce("cast<u32,i32>","window.width"),
+        kernel.createFce("cast<u32,i32>","window.height"),
+        kernel.createVariable<GLsizei>(0),
+        "deferred.depth"));
+  idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "createTexture",
+        kernel.createVariable<GLenum>(GL_TEXTURE_2D),
+        kernel.createVariable<GLenum>(GL_R32F),
+        kernel.createVariable<GLsizei>(1),
+        kernel.createFce("cast<u32,i32>","window.width"),
+        kernel.createFce("cast<u32,i32>","window.height"),
+        kernel.createVariable<GLsizei>(0),
+        "deferred.stencil"));
+  idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "Framebuffer::attachTexture",
+        kernel.createFce("cast<SharedFramebuffer,Framebuffer*>","deferred.fbo"),
+        kernel.createVariable<GLenum>(GL_COLOR_ATTACHMENT0),
+        "deferred.color",
+        kernel.createVariable<GLsizei>(0),
+        kernel.createVariable<GLsizei>(-1)));
+  idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "Framebuffer::attachTexture",
+        kernel.createFce("cast<SharedFramebuffer,Framebuffer*>","deferred.fbo"),
+        kernel.createVariable<GLenum>(GL_COLOR_ATTACHMENT1),
+        "deferred.position",
+        kernel.createVariable<GLsizei>(0),
+        kernel.createVariable<GLsizei>(-1)));
+  idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "Framebuffer::attachTexture",
+        kernel.createFce("cast<SharedFramebuffer,Framebuffer*>","deferred.fbo"),
+        kernel.createVariable<GLenum>(GL_COLOR_ATTACHMENT2),
+        "deferred.normal",
+        kernel.createVariable<GLsizei>(0),
+        kernel.createVariable<GLsizei>(-1)));
+  idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "Framebuffer::attachTexture",
+        kernel.createFce("cast<SharedFramebuffer,Framebuffer*>","deferred.fbo"),
+        kernel.createVariable<GLenum>(GL_DEPTH_ATTACHMENT),
+        "deferred.depth",
+        kernel.createVariable<GLsizei>(0),
+        kernel.createVariable<GLsizei>(-1)));
+  idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "Framebuffer::attachTexture",
+        kernel.createFce("cast<SharedFramebuffer,Framebuffer*>","deferred.fbo"),
+        kernel.createVariable<GLenum>(GL_STENCIL_ATTACHMENT),
+        "deferred.depth",
+        kernel.createVariable<GLsizei>(0),
+        kernel.createVariable<GLsizei>(-1)));
+  idleScript->toBody()->addStatement(
+      kernel.createFce(
+        "Framebuffer::drawBuffers3",
+        kernel.createFce("cast<SharedFramebuffer,Framebuffer*>","deferred.fbo"),
+        kernel.createVariable<GLenum>(GL_COLOR_ATTACHMENT0),
+        kernel.createVariable<GLenum>(GL_COLOR_ATTACHMENT1),
+        kernel.createVariable<GLenum>(GL_COLOR_ATTACHMENT2)));
+
+
+
   idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("glViewport",
         "gl",
@@ -320,23 +453,24 @@ bool Application::init(int argc,char*argv[]){
         kernel.createVariable<GLint>(0),
         kernel.createFce("cast<u32,i32>","window.width"),
         kernel.createFce("cast<u32,i32>","window.height")));
+
   idleScript->toBody()->addStatement(
-      kernel.createAlwaysExecFce("Program::use",kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData())));
-  idleScript->toBody()->addStatement(kernel.createFce("Program::set3fv",
-        kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
-        kernel.createVariable<std::string>("position"),
-        kernel.createFce("cast<f32[3],f32*>","camera.position"),
-        kernel.createVariable<GLsizei>(1)
-        ));
+      kernel.createAlwaysExecFce(
+        "Framebuffer::bind",
+        kernel.createFce("cast<SharedFramebuffer,Framebuffer*>","deferred.fbo"),
+        kernel.createVariable<GLenum>(GL_FRAMEBUFFER)));
+
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("Program::use",kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(createGBufferStatementIndex)->toFunction()->getOutputData())));
   idleScript->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
-        kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
+        kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(createGBufferStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("projection"),
         kernel.createFce("cast<f32[16],f32*>","camera.projection"),
         kernel.createVariable<GLsizei>(1),
         kernel.createVariable<GLboolean>(GL_FALSE)
         ));
   idleScript->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
-        kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
+        kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(createGBufferStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("view"),
         kernel.createFce("cast<f32[16],f32*>","camera.view"),
         kernel.createVariable<GLsizei>(1),
@@ -348,6 +482,14 @@ bool Application::init(int argc,char*argv[]){
       kernel.createAlwaysExecFce("VertexArray::unbind",kernel.createFce("cast<SharedVertexArray,VertexArray*>","modelVAO")));
   idleScript->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
   idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("Timer::elapsedFromStart","timer","time"));
+
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce(
+        "Framebuffer::unbind",
+        kernel.createFce("cast<SharedFramebuffer,Framebuffer*>","deferred.fbo"),
+        kernel.createVariable<GLenum>(GL_FRAMEBUFFER)));
+
+  idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("TwDraw"));
   idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("SDLWindow::swap","sdlwindow"));
 
   this->idleScript = std::make_shared<Tester>(kernel.variableRegister,idleScript,
