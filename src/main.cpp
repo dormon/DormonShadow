@@ -26,25 +26,11 @@
 
 #include<Camera.h>
 #include<Functions.h>
+#include<AssimpFunctions.h>
 
 #include<Font.h>
 
 #include<Tester.h>
-
-class AssimpModel{
-  public:
-    aiScene const*model = nullptr;
-    AssimpModel(aiScene const*m){
-      std::cout<<"AssimpModel::this: "<<this<<std::endl;
-      std::cout<<"AssimpModel::AssimpModel(): "<<m<<std::endl;
-      this->model = m;
-    }
-    ~AssimpModel(){
-      std::cout<<"AssimpModel::this: "<<this<<std::endl;
-      std::cout<<"AssimpModel::~AssimpModel(): "<<this->model<<std::endl;
-      if(this->model)aiReleaseImport(this->model);
-    }
-};
 
 int32_t nofVertices(std::shared_ptr<AssimpModel>const&mdl){
   if(mdl==nullptr){
@@ -99,29 +85,11 @@ std::shared_ptr<ge::gl::Buffer>assimpModelToNBO(std::shared_ptr<AssimpModel>cons
 
 namespace ge{
   namespace de{
-    template<>inline std::string keyword<std::shared_ptr<AssimpModel>>(){return"SharedAssimpModel";}
     template<>inline std::string keyword<ge::gl::Context>(){return"GL";}
     template<>inline std::string keyword<ge::util::Timer<float>>(){return"Timer";}
     template<>inline std::string keyword<ge::ad::SDLWindow>(){return"SDLWindow";}
+    template<>inline std::string keyword<std::shared_ptr<ge::de::Statement>>(){return"SharedStatement";}
   }
-}
-
-std::shared_ptr<AssimpModel>assimpLoader(std::string const&name){
-  auto model = aiImportFile(name.c_str(),aiProcess_Triangulate|aiProcess_GenNormals|aiProcess_SortByPType);
-  if(model==nullptr){
-    ge::core::printError(GE_CORE_FCENAME,"Can't open file",name);
-    return nullptr;
-  }
-  return std::make_shared<AssimpModel>(model);
-}
-
-std::shared_ptr<AssimpModel>assimpLoaderFailsafe(std::shared_ptr<AssimpModel>const&last,std::shared_ptr<AssimpModel>const&n){
-  if(n==nullptr)return last;
-  return n;
-}
-
-bool assimpLoaderFailsafeTrigger(std::shared_ptr<AssimpModel>const&l,std::shared_ptr<AssimpModel>const&n){
-  return n!=nullptr && l!=n;
 }
 
 int32_t clearMouseRel(){return 0;}
@@ -133,10 +101,14 @@ TO cast(FROM const&a);
 
 template<>inline int32_t cast(uint32_t const&a){return (int32_t)a;}
 
+void executer(std::shared_ptr<ge::de::Statement>const&statement){
+  if(statement==nullptr)return;
+  (*statement)();
+}
+
 bool Application::init(int argc,char*argv[]){
   auto argm = std::make_shared<ge::util::ArgumentManager>(argc-1,argv+1);
   ge::util::copyArgumentManager2VariableRegister(this->kernel.variableRegister,*argm,this->kernel.functionRegister);
-  std::cout<<this->kernel.variableRegister->toStr(0,this->kernel.typeRegister)<<std::endl;
 
   this->mainLoop = std::make_shared<ge::ad::SDLMainLoop>(true);
   this->mainLoop->setIdleCallback(Application::idle,this);
@@ -170,23 +142,18 @@ bool Application::init(int argc,char*argv[]){
   this->editor = std::make_shared<gde::Editor>(*this->gl,glm::uvec2(this->window->getWidth(),this->window->getHeight()));
 
   kernel.typeRegister->addType<float*>();
-  kernel.addAtomicType(
-      "SharedAssimpModel",
-      sizeof(std::shared_ptr<AssimpModel>),
-      nullptr,
-      [](void*ptr){((std::shared_ptr<AssimpModel>*)ptr)->~shared_ptr();});
   kernel.addAtomicClass<ge::util::Timer<float>>("Timer");
 
   kernel.addAtomicClass<ge::gl::Context>("GL");
 
   kernel.addAtomicClass<ge::ad::SDLWindow>();
   kernel.typeRegister->addType<ge::ad::SDLWindow*>();
+  kernel.addAtomicClass<std::shared_ptr<ge::de::Statement>>();
 
   //script part
   registerCameraPlugin(&kernel);
   registerPlugin(&kernel);
-  kernel.addFunction("assimpLoader",{"fileName","assimpModel"},assimpLoader);
-  kernel.addFunction("assimpLoaderFailsafe",{"last","new","lastOrNew"},assimpLoaderFailsafe,assimpLoaderFailsafeTrigger);
+  registerAssimpPlugin(&kernel);
   kernel.addFunction("assimpModelToVBO",{"assimpModel","vbo"},assimpModelToVBO);
   kernel.addFunction("assimpModelToNBO",{"assimpModel","vbo"},assimpModelToNBO);
   kernel.addFunction("nofVertices",{"assimpModel","number"},nofVertices);
@@ -225,7 +192,7 @@ bool Application::init(int argc,char*argv[]){
   kernel.addVariable("camera.speed"          ,0.01f);
   kernel.addVariable("camera.sensitivity"    ,3.0f);
   kernel.addVariable("shaderDirectory"       ,std::string("shaders/"));
-  kernel.addVariable("modelFileName"         ,std::string("/media/windata/ft/prace/models/cube/cube.obja"));
+  kernel.addVariable("modelFileName"         ,std::string("/media/windata/ft/prace/models/cube/cube.obj"));
   kernel.addEmptyVariable("model","SharedAssimpModel");
   kernel.addEmptyVariable("modelVertices","SharedBuffer");
   kernel.addEmptyVariable("modelNormals","SharedBuffer");
@@ -291,7 +258,7 @@ bool Application::init(int argc,char*argv[]){
       kernel.createFce("assimpModelToNBO","model","modelNormals"));
   idleScript->toBody()->addStatement(
       kernel.createFce("VertexArray::addAttrib",
-        kernel.createFce("sharedVertexArray2VertexArray*","modelVAO"),
+        kernel.createFce("cast<SharedVertexArray,VertexArray*>","modelVAO"),
         "modelVertices",
         kernel.createVariable<GLuint>(0),
         kernel.createVariable<GLint>(3),
@@ -303,7 +270,7 @@ bool Application::init(int argc,char*argv[]){
         kernel.createVariable<int32_t>(ge::gl::VertexArray::NONE)));
   idleScript->toBody()->addStatement(
       kernel.createFce("VertexArray::addAttrib",
-        kernel.createFce("sharedVertexArray2VertexArray*","modelVAO"),
+        kernel.createFce("cast<SharedVertexArray,VertexArray*>","modelVAO"),
         "modelNormals",
         kernel.createVariable<GLuint>(1),
         kernel.createVariable<GLint>(3),
@@ -317,7 +284,7 @@ bool Application::init(int argc,char*argv[]){
   auto programStatementIndex = idleScript->toBody()->addStatement(
       kernel.createFce("createVSFSProgram","program.version","shaderDirectory","program.defines","program.vertexShader","program.defines","program.fragmentShader"));
   idleScript->toBody()->addStatement(
-      kernel.createAlwaysExecFce("VertexArray::bind",kernel.createFce("sharedVertexArray2VertexArray*","modelVAO")));
+      kernel.createAlwaysExecFce("VertexArray::bind",kernel.createFce("cast<SharedVertexArray,VertexArray*>","modelVAO")));
   idleScript->toBody()->addStatement(kernel.createFce("cameraAddXRotation",
         "camera.rotX","camera.sensitivity","mouse.yrel","window.height","camera.fovy","camera.aspect","mouse.left","camera.rotX"));
   idleScript->toBody()->addStatement(kernel.createFce("cameraAddYRotation",
@@ -354,31 +321,31 @@ bool Application::init(int argc,char*argv[]){
         kernel.createFce("cast<u32,i32>","window.width"),
         kernel.createFce("cast<u32,i32>","window.height")));
   idleScript->toBody()->addStatement(
-      kernel.createAlwaysExecFce("Program::use",kernel.createFce("sharedProgram2Program*",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData())));
+      kernel.createAlwaysExecFce("Program::use",kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData())));
   idleScript->toBody()->addStatement(kernel.createFce("Program::set3fv",
-        kernel.createFce("sharedProgram2Program*",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
+        kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("position"),
-        kernel.createFce("f32[3]2f32*","camera.position"),
+        kernel.createFce("cast<f32[3],f32*>","camera.position"),
         kernel.createVariable<GLsizei>(1)
         ));
   idleScript->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
-        kernel.createFce("sharedProgram2Program*",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
+        kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("projection"),
-        kernel.createFce("f32[16]2f32*","camera.projection"),
+        kernel.createFce("cast<f32[16],f32*>","camera.projection"),
         kernel.createVariable<GLsizei>(1),
         kernel.createVariable<GLboolean>(GL_FALSE)
         ));
   idleScript->toBody()->addStatement(kernel.createFce("Program::setMatrix4fv",
-        kernel.createFce("sharedProgram2Program*",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
+        kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(programStatementIndex)->toFunction()->getOutputData()),
         kernel.createVariable<std::string>("view"),
-        kernel.createFce("f32[16]2f32*","camera.view"),
+        kernel.createFce("cast<f32[16],f32*>","camera.view"),
         kernel.createVariable<GLsizei>(1),
         kernel.createVariable<GLboolean>(GL_FALSE)
         ));
   idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("glDrawArrays","gl",kernel.createVariable<GLenum>(GL_TRIANGLES),kernel.createVariable<GLint>(0),"nofModelVertices"));
   idleScript->toBody()->addStatement(
-      kernel.createAlwaysExecFce("VertexArray::unbind",kernel.createFce("sharedVertexArray2VertexArray*","modelVAO")));
+      kernel.createAlwaysExecFce("VertexArray::unbind",kernel.createFce("cast<SharedVertexArray,VertexArray*>","modelVAO")));
   idleScript->toBody()->addStatement(kernel.createFce("incrementFrameCounter","frameCounter","frameCounter"));
   idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("Timer::elapsedFromStart","timer","time"));
   idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("SDLWindow::swap","sdlwindow"));
