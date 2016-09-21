@@ -199,11 +199,13 @@ bool Application::init(int argc,char*argv[]){
   kernel.addVariable("camera.speed"          ,0.01f);
   kernel.addVariable("camera.sensitivity"    ,3.0f);
   kernel.addVariable("shaderDirectory"       ,std::string("shaders/"));
-  kernel.addVariable("modelFileName"         ,std::string("/media/dormon/Data/models/o/o.3ds"));//windata/ft/prace/models/cube/cube.obj"));
+  //kernel.addVariable("modelFileName"         ,std::string("/media/dormon/Data/models/o/o.3ds"));//windata/ft/prace/models/cube/cube.obj"));
+  kernel.addVariable("modelFileName"         ,std::string("/media/windata/ft/prace/models/cube/cube.obj"));
   kernel.addEmptyVariable("model","SharedAssimpModel");
   kernel.addEmptyVariable("modelVertices","SharedBuffer");
   kernel.addEmptyVariable("modelNormals","SharedBuffer");
   kernel.addVariable("modelVAO"              ,std::make_shared<ge::gl::VertexArray>());
+  kernel.addVariable("emptyVAO"              ,std::make_shared<ge::gl::VertexArray>());
   kernel.addVariable("nofModelVertices"      ,(int32_t)0);
   kernel.addVariable("gl"                    ,ge::gl::Context{});
   kernel.addVariable("frameCounter"          ,(uint32_t)0);
@@ -217,8 +219,8 @@ bool Application::init(int argc,char*argv[]){
   kernel.addEmptyVariable("deferred.position","SharedTexture");
   kernel.addEmptyVariable("deferred.normal"  ,"SharedTexture");
   kernel.addEmptyVariable("deferred.color"   ,"SharedTexture");
+  kernel.addEmptyVariable("deferred.shadowMask","SharedTexture");
   kernel.addEmptyVariable("deferred.depth"   ,"SharedTexture");
-  kernel.addEmptyVariable("deferred.stencil" ,"SharedTexture");
   kernel.addVariable     ("deferred.fbo"     ,std::make_shared<ge::gl::Framebuffer>());
   keyboard::registerKeyboard(&kernel);
   mouse::registerMouse(&kernel);
@@ -257,8 +259,6 @@ bool Application::init(int argc,char*argv[]){
 
 
   auto idleScript = std::make_shared<ge::de::Body>(true);
-  idleScript->toBody()->addStatement(
-      kernel.createAlwaysExecFce("glClear","gl",kernel.createVariable<GLbitfield>(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)));
   idleScript->toBody()->addStatement(
       kernel.createFce("assimpLoaderFailsafe","model",kernel.createFce("assimpLoader","modelFileName"),"model"));
 
@@ -395,7 +395,7 @@ bool Application::init(int argc,char*argv[]){
         kernel.createFce("cast<u32,i32>","window.width"),
         kernel.createFce("cast<u32,i32>","window.height"),
         kernel.createVariable<GLsizei>(0),
-        "deferred.stencil"));
+        "deferred.shadowMask"));
   idleScript->toBody()->addStatement(
       kernel.createFce(
         "Framebuffer::attachTexture",
@@ -459,6 +459,8 @@ bool Application::init(int argc,char*argv[]){
         "Framebuffer::bind",
         kernel.createFce("cast<SharedFramebuffer,Framebuffer*>","deferred.fbo"),
         kernel.createVariable<GLenum>(GL_FRAMEBUFFER)));
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("glClear","gl",kernel.createVariable<GLbitfield>(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)));
 
   idleScript->toBody()->addStatement(
       kernel.createAlwaysExecFce("Program::use",kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(createGBufferStatementIndex)->toFunction()->getOutputData())));
@@ -488,6 +490,26 @@ bool Application::init(int argc,char*argv[]){
         "Framebuffer::unbind",
         kernel.createFce("cast<SharedFramebuffer,Framebuffer*>","deferred.fbo"),
         kernel.createVariable<GLenum>(GL_FRAMEBUFFER)));
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("glClear","gl",kernel.createVariable<GLbitfield>(GL_DEPTH_BUFFER_BIT)));
+
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("VertexArray::bind",kernel.createFce("cast<SharedVertexArray,VertexArray*>","emptyVAO")));
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("Program::use",kernel.createFce("cast<SharedProgram,Program*>",idleScript->toBody()->at(drawGBufferStatementIndex)->toFunction()->getOutputData())));
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("Texture::bind",kernel.createFce("cast<SharedTexture,Texture*>","deferred.color"),kernel.createVariable<GLuint>(0)));
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("Texture::bind",kernel.createFce("cast<SharedTexture,Texture*>","deferred.position"),kernel.createVariable<GLuint>(1)));
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("Texture::bind",kernel.createFce("cast<SharedTexture,Texture*>","deferred.normal"),kernel.createVariable<GLuint>(2)));
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("Texture::bind",kernel.createFce("cast<SharedTexture,Texture*>","deferred.shadowMask"),kernel.createVariable<GLuint>(3)));
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("glDrawArrays","gl",kernel.createVariable<GLenum>(GL_TRIANGLE_STRIP),kernel.createVariable<GLint>(0),kernel.createVariable<GLsizei>(4)));
+  idleScript->toBody()->addStatement(
+      kernel.createAlwaysExecFce("VertexArray::unbind",kernel.createFce("cast<SharedVertexArray,VertexArray*>","emptyVAO")));
+
 
   idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("TwDraw"));
   idleScript->toBody()->addStatement(kernel.createAlwaysExecFce("SDLWindow::swap","sdlwindow"));

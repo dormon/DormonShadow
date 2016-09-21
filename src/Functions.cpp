@@ -106,7 +106,8 @@ void registerPlugin(Kernel*kernel){
 
   kernel->addFunction("cast<SharedProgram,Program*>"        ,{"sharedProgram"    ,"program*"    },sharedPointerToPointer<ge::gl::Program    >);
   kernel->addFunction("cast<SharedVertexArray,VertexArray*>",{"sharedVertexArray","vertexArray*"},sharedPointerToPointer<ge::gl::VertexArray>);
-  kernel->addFunction("cast<SharedFramebuffer,Framebuffer*>",{"sharedFramebuffer","Framebuffer*"},sharedPointerToPointer<ge::gl::Framebuffer>);
+  kernel->addFunction("cast<SharedFramebuffer,Framebuffer*>",{"sharedFramebuffer","framebuffer*"},sharedPointerToPointer<ge::gl::Framebuffer>);
+  kernel->addFunction("cast<SharedTexture,Texture*>"        ,{"sharedTexture"    ,"texture*"    },sharedPointerToPointer<ge::gl::Texture    >);
 
   kernel->addFunction("shaderSourceLoader"    ,{"version","defines","dir","fileNames","source"},shaderSourceLoader);
   kernel->addFunction("createVertexShader"    ,{"source","sharedShader"},createShader<GL_VERTEX_SHADER>);
@@ -148,5 +149,6 @@ void registerPlugin(Kernel*kernel){
   kernel->addFunction("Framebuffer::drawBuffers4",{"Framebuffer","buffer0","buffer1","buffer2","buffer3"          },&framebufferDrawBuffers<GLenum,GLenum,GLenum,GLenum>);
   kernel->addFunction("Framebuffer::drawBuffers5",{"Framebuffer","buffer0","buffer1","buffer2","buffer3","buffer4"},&framebufferDrawBuffers<GLenum,GLenum,GLenum,GLenum,GLenum>);
 
-  
+  kernel->addFunction("Texture::bind"  ,{"Texture","unit"},&ge::gl::Texture::bind  );
+  kernel->addFunction("Texture::unbind",{"Texture","unit"},&ge::gl::Texture::unbind);
 }
