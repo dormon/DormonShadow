@@ -88,7 +88,6 @@ namespace ge{
     template<>inline std::string keyword<ge::gl::Context>(){return"GL";}
     template<>inline std::string keyword<ge::util::Timer<float>>(){return"Timer";}
     template<>inline std::string keyword<ge::ad::SDLWindow>(){return"SDLWindow";}
-    template<>inline std::string keyword<std::shared_ptr<ge::de::Statement>>(){return"SharedStatement";}
   }
 }
 
@@ -148,7 +147,6 @@ bool Application::init(int argc,char*argv[]){
 
   kernel.addAtomicClass<ge::ad::SDLWindow>();
   kernel.typeRegister->addType<ge::ad::SDLWindow*>();
-  kernel.addAtomicClass<std::shared_ptr<ge::de::Statement>>();
 
   //script part
   registerCameraPlugin(&kernel);

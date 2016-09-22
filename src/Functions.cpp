@@ -68,7 +68,10 @@ std::shared_ptr<ge::gl::Texture>createTexture(
   return result;
 }
 
-
+void exec(std::shared_ptr<Statement>const&cmd){
+  if(!cmd)return;
+  (*cmd)();
+}
 
 
 void registerPlugin(Kernel*kernel){
@@ -103,6 +106,10 @@ void registerPlugin(Kernel*kernel){
   kernel->addAtomicClass<std::shared_ptr<ge::gl::Sampler          >>();
   kernel->addAtomicClass<std::shared_ptr<ge::gl::ProgramPipeline  >>();
   kernel->addAtomicClass<std::shared_ptr<ge::gl::AsynchronousQuery>>();
+
+  kernel->addAtomicClass<ge::de::Statement>();
+  kernel->typeRegister->addType<ge::de::Statement*>();
+  kernel->addAtomicClass<std::shared_ptr<ge::de::Statement>>();
 
   kernel->addFunction("cast<SharedProgram,Program*>"        ,{"sharedProgram"    ,"program*"    },sharedPointerToPointer<ge::gl::Program    >);
   kernel->addFunction("cast<SharedVertexArray,VertexArray*>",{"sharedVertexArray","vertexArray*"},sharedPointerToPointer<ge::gl::VertexArray>);
@@ -151,4 +158,6 @@ void registerPlugin(Kernel*kernel){
 
   kernel->addFunction("Texture::bind"  ,{"Texture","unit"},&ge::gl::Texture::bind  );
   kernel->addFunction("Texture::unbind",{"Texture","unit"},&ge::gl::Texture::unbind);
+
+  kernel->addFunction("exec",{"statement"},&exec);
 }

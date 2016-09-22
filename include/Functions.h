@@ -2,6 +2,7 @@
 
 #include<geDE/Keyword.h>
 #include<geGL/geGL.h>
+#include<geDE/Statement.h>
 
 namespace ge{
   namespace de{
@@ -26,6 +27,9 @@ namespace ge{
     template<>inline std::string keyword<std::shared_ptr<ge::gl::Sampler          >>(){return"SharedSampler"          ;}
     template<>inline std::string keyword<std::shared_ptr<ge::gl::ProgramPipeline  >>(){return"SharedProgramPipeline"  ;}
     template<>inline std::string keyword<std::shared_ptr<ge::gl::AsynchronousQuery>>(){return"SharedAsynchronousQuery";}
+    template<>inline std::string keyword<ge::de::Statement>(){return"Statement";}
+    template<>inline std::string keyword<ge::de::Statement*>(){return"Statement*";}
+    template<>inline std::string keyword<std::shared_ptr<ge::de::Statement>>(){return"SharedStatement";}
   }
 }
 
